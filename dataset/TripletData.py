@@ -4,17 +4,18 @@ from PIL import Image
 import random
 
 class TripletData(Dataset):
-    def __init__(self, img_dir, transforms, cats=102, split="train"):
+    def __init__(self, img_dir, transforms, cats=17, split="train", path="dataset/flowers/train"):
         self.img_dir = img_dir
         self.split = split
         self.cats = cats
         self.transforms = transforms
+        self.path = path
 
     def __len__(self):
         return 8*self.cats
         
-    def __getitem__(self, index):
-        idx = str(idx&self.cats + 1)
+    def __getitem__(self, idx):
+        idx = str(idx//80 + 1)
 
         positives = os.listdir(os.path.join(self.img_dir, idx))
         im1, im2 = random.sample(positives, 2)

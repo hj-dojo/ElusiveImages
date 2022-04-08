@@ -3,11 +3,15 @@ Train:
   learning_rate: 0.1
   reg: 0.0005
   epochs: 10
+  momentum: .9
 
 network:
   model: 'ResNet'
 
 data:
-  folder: 'data/flowers'
+  data: 'dataset/flowers'
 loss:
-  loss: 'TripletLoss'
+  loss_type: 'TripletLoss'
+
+dataset:
+  dataset: 'TripletData'
