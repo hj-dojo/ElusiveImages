@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 
-class TripletLosss(nn.Module):
+class TripletLoss(nn.Module):
     def __init__(self, margin=1.0):
         super(TripletLoss, self).__init__()
         self.margin = margin
