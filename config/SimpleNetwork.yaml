@@ -1,8 +1,8 @@
 Train:
-  batch_size: 32
-  learning_rate: 0.1
+  batch_size: 16
+  learning_rate: 0.001
   reg: 0.0005
-  epochs: 10
+  epochs: 50
   momentum: .9
 
 network:
