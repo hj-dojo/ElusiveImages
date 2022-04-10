@@ -1,13 +1,17 @@
 Train:
-  batch_size: 32
-  learning_rate: 0.1
+#  batch_size: 32
+  batch_size: 8
+  learning_rate: 0.01
   reg: 0.0005
-  epochs: 10
+  epochs: 100
+  momentum: 0.9
 
 network:
   model: 'ResNet'
 
 data:
-  folder: 'data/flowers'
+  folder: 'data'
+  dataset: 'TripletData'
+
 loss:
   loss: 'TripletLoss'

@@ -13,8 +13,8 @@ class TripletData(Dataset):
     def __len__(self):
         return 8*self.cats
         
-    def __getitem__(self, index):
-        idx = str(idx&self.cats + 1)
+    def __getitem__(self, idx):
+        idx = str(idx % self.cats + 1)
 
         positives = os.listdir(os.path.join(self.img_dir, idx))
         im1, im2 = random.sample(positives, 2)
@@ -25,7 +25,7 @@ class TripletData(Dataset):
         negs = os.listdir(os.path.join(self.img_dir, neg_cat))
         im3 = random.choice(negs)
 
-        im1, im2, im3 = os.path.join(self.img_dir, idx, im1), os.path.join(self.img_dir, idx, im2), os.path.join(self.path, neg_cat, im3)
+        im1, im2, im3 = os.path.join(self.img_dir, idx, im1), os.path.join(self.img_dir, idx, im2), os.path.join(self.img_dir, neg_cat, im3)
 
         im1 = self.transforms(Image.open(im1))
         im2 = self.transforms(Image.open(im2))

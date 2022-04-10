@@ -9,8 +9,9 @@ dependencies:
   - scipy
   - future
   - pip
-  - faiss=1.7.2=py39he9b8f7d_0_cpu
-  - faiss-cpu=1.7.2=he781eb1_0  
-  - pytorch=1.9.0=cpu_py39h28f9090_2
-  - pillow=7.2.0=py39h31b929e_2
+  - faiss
+  - faiss-cpu
+  - pytorch
+  - torchvision
+  - pillow
 
