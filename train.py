@@ -11,6 +11,7 @@ from dataset import TripletData
 from loss import TripletLoss
 from utils import compute_map
 import torchvision.transforms as transforms
+import torchvision.models as tvmodels
 
 
 parser = argparse.ArgumentParser()
@@ -26,8 +27,8 @@ def main():
             setattr(args, k, v)
     
     if args.model == 'ResNet':
-        model = resnet32()
-
+        # model = resnet32()
+        models = tvmodels.resnet18()
     if args.dataset == 'TripletData':
         train_transforms = transforms.Compose([
         transforms.Resize((224,224)),
@@ -42,15 +43,16 @@ def main():
 
         val_dataset = TripletData(args.data+'/test', val_transforms)
         train_dataset = TripletData(args.data+'/test', train_transforms, path="dataset/flowers/test")
+        print(len(train_dataset))
 
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     # if torch.cuda.is_available:
     #     model = model.cuda()
     
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
-    optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
+    optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
     for epoch in range(args.epochs):
         loss = 0.0
         model.train()
@@ -63,19 +65,18 @@ def train(epoch, loader, model, opt, crit, prevloss):
         # data, target = d
         # if torch.cuda.is_available():
             # data = data.cuda()
-            # target = target.cuda()
-        
+            # target = target.cuda()        
         opt.zero_grad()
         x1, x2, x3 = data
         e1, e2, e3 = model(x1), model(x2), model(x3)
         loss = crit(e1, e2, e3)
-        currloss = prevloss + loss
+        prevloss += loss
         loss.backward()
         opt.step()
         # batch_map = compute_map(out, target)
         # print("BATCH MAP IS: {batch_map}").format(batch_map)
-    print("curr loss is", currloss)
-    return currloss
+    print("curr loss is", prevloss)
+    return prevloss
 
 
 def validate(epoch, loader, model, crit):

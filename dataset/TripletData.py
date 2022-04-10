@@ -1,3 +1,4 @@
+from numpy import positive
 from torch.utils.data import Dataset
 import os
 from PIL import Image
@@ -12,24 +13,29 @@ class TripletData(Dataset):
         self.path = path
 
     def __len__(self):
-        return 8*self.cats
+        return 17*self.cats
         
     def __getitem__(self, idx):
-        idx = str(idx//80 + 1)
-
-        positives = os.listdir(os.path.join(self.img_dir, idx))
+        # our positive class for the triplet
+        # print("IDX IZ",idx)
+        idx = str(idx%self.cats + 1)
+        # print(idx)
+        
+        # choosing our pair of positive images (im1, im2)
+        positives = os.listdir(os.path.join(self.path, idx))
         im1, im2 = random.sample(positives, 2)
-
-        neg_cats = [str(x+1) for x in range(self.cats)]
-        neg_cats.remove(idx)
-        neg_cat = str(random.choice(neg_cats))
-        negs = os.listdir(os.path.join(self.img_dir, neg_cat))
-        im3 = random.choice(negs)
-
-        im1, im2, im3 = os.path.join(self.img_dir, idx, im1), os.path.join(self.img_dir, idx, im2), os.path.join(self.path, neg_cat, im3)
-
+        
+        # choosing a negative class and negative image (im3)
+        negative_cats = [str(x+1) for x in range(self.cats)]
+        negative_cats.remove(idx)
+        negative_cat = str(random.choice(negative_cats))
+        negatives = os.listdir(os.path.join(self.img_dir, negative_cat))
+        im3 = random.choice(negatives)
+        
+        im1,im2,im3 = os.path.join(self.img_dir, idx, im1), os.path.join(self.img_dir, idx, im2), os.path.join(self.img_dir, negative_cat, im3)
+        
         im1 = self.transforms(Image.open(im1))
         im2 = self.transforms(Image.open(im2))
         im3 = self.transforms(Image.open(im3))
-
+        
         return [im1, im2, im3]
