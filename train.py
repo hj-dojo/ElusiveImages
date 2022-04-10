@@ -1,23 +1,29 @@
 import argparse
+import glob
+import itertools
 import os
+import pathlib
 
+import faiss
+import numpy as np
 import torch
 import torchvision.transforms as transforms
 import yaml
+from PIL import Image
 from torch.utils.data import DataLoader
 
 from dataset.TripletData import TripletData
 from loss.TripletLoss import TripletLoss
 from models import resnet32
-from utils.MAP import compute_map
-
-import faiss
-import glob
-from PIL import Image
-import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
+
+
+# Setting seed value to reproduce results
+torch.manual_seed(1)
+import random;random.seed(1)
+np.random.seed(1)
 
 
 def main():
@@ -34,54 +40,60 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    img_size = 224
-    cats = 16
+    print(args)
+
     if args.dataset == 'TripletData':
         train_transforms = transforms.Compose([
-            transforms.Resize((img_size, img_size)),
+            transforms.Resize((args.img_size, args.img_size)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
+        # ToDo: Why do we need two separate transforms?
         valid_transforms = transforms.Compose([
-            transforms.Resize((img_size, img_size)),
+            transforms.Resize((args.img_size, args.img_size)),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
-        test_transforms = transforms.Compose([
-            transforms.Resize((img_size, img_size)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
+        # test_transforms = transforms.Compose([
+        #     transforms.Resize((args.img_size, args.img_size)),
+        #     transforms.RandomHorizontalFlip(),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
-        train_path, valid_path, test_path = os.path.join(args.folder, 'train'), os.path.join(args.folder, 'valid'), os.path.join(args.folder, 'test')
-        train_dataset = TripletData(train_path, train_transforms, cats=cats)
-        val_dataset = TripletData(valid_path, valid_transforms, cats=cats)
-        test_dataset = TripletData(test_path, test_transforms, cats=cats)
+        img_path, valid_path, test_path = os.path.join(args.folder, 'train'), os.path.join(args.folder,
+                                                                                             'valid'), os.path.join(
+            args.folder, 'test')
+        train_dataset = TripletData(img_path, train_transforms, cats=args.cats)
+        # valid_dataset = TripletData(valid_path, valid_transforms, cats=args.cats)
+        # test_dataset = TripletData(test_path, test_transforms, cats=args.cats)
 
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
-        test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+        # valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
+        # test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     if torch.cuda.is_available:
         model = model.cuda()
 
     if args.loss == 'TripletLoss':
         criterion = TripletLoss()
-    optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
+
+    if args.optimizer.lower() == 'sdg':
+        optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
+    elif args.optimizer.lower() == 'adam' :
+        optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
+    else:
+        raise Exception("Invalid optimizer option".format(args.optimizer))
 
     # Train
     for epoch in range(args.epochs):
         train(epoch, train_loader, model, optimizer, criterion, device)
 
     # Create image search index
-    faiss_index, im_indices = create_faiss_index(model, train_path, valid_transforms)
+    faiss_index, im_indices = create_faiss_index(model, img_path, valid_transforms, args.cats)
 
     # Validation data
-    # test(model, valid_path, valid_transforms, fasis_index, im_indices)
-
-    # Test data
-    test(model, test_path, test_transforms, faiss_index, im_indices)
+    evaluate(model, valid_path, valid_transforms, faiss_index, im_indices, args.cats)
 
 
 def train(epoch, loader, model, optimizer, criterion, device):
@@ -103,15 +115,18 @@ def train(epoch, loader, model, optimizer, criterion, device):
     print("Train Loss: {}".format(epoch_loss.item()))
 
 
-def create_faiss_index(model, train_path, valid_transforms):
+def create_faiss_index(model, img_path, transforms, cats):
     faiss_index = faiss.IndexFlatL2(10)  # build the index
 
     im_indices = []
     with torch.no_grad():
-        for f in glob.glob(os.path.join(train_path, '*/*')):
+        train_images_from_cats = list(
+            itertools.chain(*[glob.glob(os.path.join(img_path, '{}/*'.format(idx))) for idx in range(1, cats + 1)]))
+
+        for f in train_images_from_cats:
             im = Image.open(f)
             im = im.resize((224, 224))
-            im = torch.tensor([valid_transforms(im).numpy()]).cuda()
+            im = torch.tensor([transforms(im).numpy()]).cuda()
 
             preds = model(im)
             preds = np.array([preds[0].cpu().numpy()])
@@ -130,6 +145,29 @@ def test(model, test_path, valid_transforms, faiss_index, im_indices):
             test_embed = model(im).cpu().numpy()
             _, I = faiss_index.search(test_embed, 5)
             print("Input image: {}, Retrieved Image: {}".format(f, im_indices[I[0][0]]))
+
+
+def evaluate(model, test_path, test_transforms, faiss_index, im_indices, cats):
+    test_images_from_cats = list(
+        itertools.chain(*[glob.glob(os.path.join(test_path, '{}/*'.format(idx))) for idx in range(1, cats + 1)]))
+    correct_matches = 0
+    with torch.no_grad():
+        for test_image in test_images_from_cats:
+            im = Image.open(test_image)
+            im = im.resize((224, 224))
+            im = torch.tensor([test_transforms(im).numpy()]).cuda()
+
+            test_embed = model(im).cpu().numpy()
+            _, I = faiss_index.search(test_embed, 5)
+            output_image = im_indices[I[0][0]]
+            input_imgage_cat = pathlib.Path(test_image).parts[2]
+            output_imgage_cat = pathlib.Path(output_image).parts[2]
+            if input_imgage_cat == output_imgage_cat:
+                correct_matches += 1
+            print("Input image: {}, Retrieved Image: {}".format(test_image, output_image))
+    print(args)
+    print("Accuracy: {}/{} : {}".format(correct_matches, len(test_images_from_cats),
+                                        correct_matches / len(test_images_from_cats)))
 
 
 if __name__ == '__main__':

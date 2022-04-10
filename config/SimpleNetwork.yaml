@@ -1,9 +1,12 @@
 Train:
+  img_size: 224
+  cats: 20
 #  batch_size: 32
-  batch_size: 8
-  learning_rate: 0.01
+  batch_size: 12
+  learning_rate: 0.1
   reg: 0.0005
-  epochs: 100
+  epochs: 10
+  optimizer: 'adam'
   momentum: 0.9
 
 network:

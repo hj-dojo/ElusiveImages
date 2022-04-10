@@ -1,1 +1,5 @@
 dataset/flowers
+__pycache__
+.idea
+*tgz
+*jpg
