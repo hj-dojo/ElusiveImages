@@ -11,9 +11,10 @@ class TripletData(Dataset):
         self.cats = cats
         self.transforms = transforms
         self.path = path
+        self.used = set()
 
     def __len__(self):
-        return 17*self.cats
+        return 20*self.cats
         
     def __getitem__(self, idx):
         # our positive class for the triplet
@@ -32,8 +33,11 @@ class TripletData(Dataset):
         negatives = os.listdir(os.path.join(self.img_dir, negative_cat))
         im3 = random.choice(negatives)
         
+        previm1, previm2, previm3 = im1, im2, im3
         im1,im2,im3 = os.path.join(self.img_dir, idx, im1), os.path.join(self.img_dir, idx, im2), os.path.join(self.img_dir, negative_cat, im3)
-        
+        while (im1, im2, im3) in self.used:
+          im1,im2,im3 = os.path.join(self.img_dir, idx, previm1), os.path.join(self.img_dir, idx, previm2), os.path.join(self.img_dir, negative_cat, previm3)
+        self.used.add((im1,im2,im3))
         im1 = self.transforms(Image.open(im1))
         im2 = self.transforms(Image.open(im2))
         im3 = self.transforms(Image.open(im3))
