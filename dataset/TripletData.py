@@ -18,9 +18,7 @@ class TripletData(Dataset):
         
     def __getitem__(self, idx):
         # our positive class for the triplet
-        # print("IDX IZ",idx)
         idx = str(idx%self.cats + 1)
-        # print(idx)
         
         # choosing our pair of positive images (im1, im2)
         positives = os.listdir(os.path.join(self.path, idx))
@@ -35,8 +33,13 @@ class TripletData(Dataset):
         
         previm1, previm2, previm3 = im1, im2, im3
         im1,im2,im3 = os.path.join(self.img_dir, idx, im1), os.path.join(self.img_dir, idx, im2), os.path.join(self.img_dir, negative_cat, im3)
-        while (im1, im2, im3) in self.used:
+        max_tries = 50
+        i = 0
+        while (im1, im2, im3) in self.used and i <= max_tries:
+          if i == max_tries:
+            print("Couldn't find new triplet")
           im1,im2,im3 = os.path.join(self.img_dir, idx, previm1), os.path.join(self.img_dir, idx, previm2), os.path.join(self.img_dir, negative_cat, previm3)
+          i += 1
         self.used.add((im1,im2,im3))
         im1 = self.transforms(Image.open(im1))
         im2 = self.transforms(Image.open(im2))
