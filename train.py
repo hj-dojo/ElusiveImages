@@ -10,6 +10,7 @@ from models import resnet32
 from dataset import TripletData
 from loss import TripletLoss
 from utils import compute_map
+from database import BaseDatabase
 import torchvision.transforms as transforms
 import torchvision.models as tvmodels
 import faiss
@@ -20,6 +21,7 @@ import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
+parser.add_argument('--mode', default='train')
 
 def main():
     global args
@@ -29,95 +31,100 @@ def main():
     for key in config:
         for k, v in config[key].items():
             setattr(args, k, v)
-    
+    if args.mode != 'train':
+      raise NotImplementedError('Only train mode implmented so far')
+
     if args.model == 'ResNet':
         # model = resnet32()
         model = tvmodels.resnet18()
+    else:
+      raise NotImplementedError(args.model + " model not implemented!")
     if args.dataset == 'TripletData':
         train_transforms = transforms.Compose([
-        transforms.Resize((224,224)),
+        transforms.Resize((args.img_w,args.img_h)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
 
         val_transforms = transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((args.img_w, args.img_h)),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
 
-        val_dataset = TripletData(args.data+'/test', val_transforms, path="dataset/flowers/train")
-        train_dataset = TripletData(args.data+'/train', train_transforms, path="dataset/flowers/train")
-        print(len(train_dataset))
+        # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
+        val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
+        train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
 
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+    else:
+      raise NotImplementedError(args.dataset + " dataset not implemented!")
+
     if torch.cuda.is_available:
         model = model.cuda()
     
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
+    else:
+      raise NotImplementedError(args.loss_type + " loss not implemented!")
+
     optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
+    
     for epoch in range(args.epochs):
+        if epoch % args.validevery == 0:
+            print("RUNNING VALIDATION AT EPOCH", epoch)
+            trainpath = args.train_path
+            valdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
+            test(valdb, args.val_path)
         loss = 0.0
         model.train()
         loss = train(epoch, train_loader, model, optimizer, criterion, loss)
         # acc, cm = validate(epoch, val_loader, model, criterion)
-    print('NOW WE VALIDate')
-    valid(val_transforms, model)
-def train(epoch, loader, model, opt, crit, prevloss):
-    print("Start training")
+
+    trainpath = args.train_path
+    testdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
+    test(testdb, args.test_path)
+
+def train(epoch, loader, model, opt, crit, loss):
+    print("Epoch", str(epoch))
     for data in tqdm(loader):
-        # data, target = d
-        # if torch.cuda.is_available():
-        #     print(data)
-        #     data = data.cuda()
-        #     target = target.cuda()        
         opt.zero_grad()
         x1, x2, x3 = data
         e1, e2, e3 = model(x1.to('cuda')), model(x2.to('cuda')), model(x3.to('cuda'))
-        loss = crit(e1, e2, e3)
-        prevloss += loss
-        loss.backward()
+        l = crit(e1, e2, e3)
+        l.backward()
         opt.step()
+        loss += l
         # batch_map = compute_map(out, target)
         # print("BATCH MAP IS: {batch_map}").format(batch_map)
-    print("curr loss is", prevloss)
-    return prevloss
+    print("Current loss is", loss)
+    return loss
 
 
-def valid(val_transforms, model):
-    faiss_index = faiss.IndexFlatL2(1000)   # build the index
+def create_database(size, dbtype, transforms, model, path, saveto=None):
 
-    # storing the image representations
-    im_indices = []
-    with torch.no_grad():
-        # print(glob.glob(os.path.join("dataset/flowers/train", '*/*')))
-        for f in glob.glob(os.path.join("dataset/flowers/train", '*/*')):
-            # print(f)
-            im = Image.open(f)
-            im = im.resize((224,224))
-            im = torch.tensor([val_transforms(im).numpy()]).cuda()
-        
-            preds = model(im)
-            preds = np.array([preds[0].cpu().numpy()])
-            faiss_index.add(preds) #add the representation to index
-            im_indices.append(f)   #store the image name to find it later on
+    if dbtype == "Base":
+      db = BaseDatabase(model, path, transforms, size=size, saveto=saveto)
+      return db
+    else:
+      raise NotImplementedError(dbtype + " database not implemented!")
 
+def test(db, test_path):
     # Retrieval with a query image
+    category_matches = 0
     with torch.no_grad():
-        for f in os.listdir("dataset/flowers/test"):
+        for f in os.listdir(test_path):
             # query/test image
-            qimg = os.listdir(os.path.join("dataset/flowers/test",f))[0]
-            print("QIMG",qimg)
-            im = Image.open(os.path.join("dataset/flowers/test",f, qimg))
-            im = im.resize((224,224))
-            im = torch.tensor([val_transforms(im).numpy()]).cuda()
-        
-            test_embed = model(im).cpu().numpy()
-            _, I = faiss_index.search(test_embed, 5)
-            print("Retrieved Image: {}".format(im_indices[I[0][0]]))
+            qimg = os.listdir(os.path.join(test_path,f))[0]
+            print("CLASS",f,".... IMG",qimg)
+            im = Image.open(os.path.join(test_path,f, qimg))
+            I = db.search(im, 5)
+            print("Retrieved Image: {}".format(db.im_indices[I[0][0]]))
+            if db.im_indices[I[0][0]].split("/")[3] == f:
+                print("Found a match from", qimg, "class", f )
+                category_matches += 1
+    print("CATEGORY MATCHES: ", category_matches)
 
-    
 
 if __name__ == '__main__':
     main()
