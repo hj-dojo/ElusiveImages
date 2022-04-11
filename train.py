@@ -23,6 +23,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
+# Setting seed value to reproduce results
+torch.manual_seed(1)
+import random;random.seed(1)
+np.random.seed(1)
+
+
+
 def main():
     global args
     args = parser.parse_args()
@@ -68,7 +75,12 @@ def main():
     else:
       raise NotImplementedError(args.loss_type + " loss not implemented!")
 
-    optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
+    if args.optimizer.lower() == 'sdg':
+        optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
+    elif args.optimizer.lower() == 'adam' :
+        optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
+    else:
+        raise Exception("Invalid optimizer option".format(args.optimizer))    
     
     for epoch in range(args.epochs):
         if epoch % args.validevery == 0:
