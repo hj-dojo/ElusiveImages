@@ -1,3 +1,5 @@
+#!/bin/bash
+
 wget http://www.robots.ox.ac.uk/~vgg/data/flowers/17/17flowers.tgz
 tar -zxvf 17flowers.tgz
 mkdir dataset/flowers/
@@ -13,7 +15,7 @@ for i in $(seq 1 17);
 done
 for f in $(ls dataset/flowers | grep jpg); 
     do
-    n=${f:6:4};
+    n=${f:6:4}
     s=train
     b=$(expr $n % 5)
     adjc=$(expr $n - 1)
