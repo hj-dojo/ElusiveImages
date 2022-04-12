@@ -1,5 +1,11 @@
 # ElusiveImages
 
+## QUICK SETUP
+https://colab.research.google.com/drive/1vh8OMiXm0jaTRjS--0TKvwNM-ycQHtqq#scrollTo=Sv2hfxNoUiff
+With the above notebook...
+File -> save a copy in drive
+The first time you do this, you will need to clone the repo to your google drive account. Follow the first two cells in the GITHUB section for this. You will then need to download the data. Follow the GETTING THE DATA section.
+
 ## Pipeline
 An image retrieval pipeline consists of: A database, an image embedding module (same as used for your database), and a ranking module.
 The pipeline supports the `query(input, k)` method, which returns the top k images based on your input.
