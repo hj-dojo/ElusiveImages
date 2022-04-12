@@ -1,6 +1,8 @@
 #!/bin/bash
 
+# Note: if wget doesn't work, try with curl 
 wget http://www.robots.ox.ac.uk/~vgg/data/flowers/17/17flowers.tgz
+#curl -LO http://www.robots.ox.ac.uk/~vgg/data/flowers/17/17flowers.tgz
 tar -zxvf 17flowers.tgz
 mkdir dataset/flowers/
 mkdir dataset/flowers/train

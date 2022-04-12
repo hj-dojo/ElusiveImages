@@ -1,23 +1,19 @@
 import argparse
-from pickletools import optimize
-from tqdm.notebook import tqdm
-from numpy import argsort
-import yaml
+import os
+import pathlib
+
+import numpy as np
 import torch
-import torch.nn as nn
+import torchvision.models as tvmodels
+import torchvision.transforms as transforms
+import yaml
+from PIL import Image
 from torch.utils.data import DataLoader
-from models import resnet32
+from tqdm.notebook import tqdm
+
+from database import BaseDatabase
 from dataset import TripletData
 from loss import TripletLoss
-from utils import compute_map
-from database import BaseDatabase
-import torchvision.transforms as transforms
-import torchvision.models as tvmodels
-import faiss
-import glob
-import numpy as np
-from PIL import Image
-import os
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
@@ -25,9 +21,10 @@ parser.add_argument('--mode', default='train')
 
 # Setting seed value to reproduce results
 torch.manual_seed(1)
-import random;random.seed(1)
-np.random.seed(1)
+import random;
 
+random.seed(1)
+np.random.seed(1)
 
 
 def main():
@@ -39,24 +36,24 @@ def main():
         for k, v in config[key].items():
             setattr(args, k, v)
     if args.mode != 'train':
-      raise NotImplementedError('Only train mode implmented so far')
+        raise NotImplementedError('Only train mode implemented so far')
 
     if args.model == 'ResNet':
         # model = resnet32()
         model = tvmodels.resnet18()
     else:
-      raise NotImplementedError(args.model + " model not implemented!")
+        raise NotImplementedError(args.model + " model not implemented!")
     if args.dataset == 'TripletData':
         train_transforms = transforms.Compose([
-        transforms.Resize((args.img_w,args.img_h)),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
+            transforms.Resize((args.img_w, args.img_h)),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
         val_transforms = transforms.Compose([
-        transforms.Resize((args.img_w, args.img_h)),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),])
+            transforms.Resize((args.img_w, args.img_h)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
         # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
         val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
@@ -65,23 +62,23 @@ def main():
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     else:
-      raise NotImplementedError(args.dataset + " dataset not implemented!")
+        raise NotImplementedError(args.dataset + " dataset not implemented!")
 
     if torch.cuda.is_available:
         model = model.cuda()
-    
+
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
     else:
-      raise NotImplementedError(args.loss_type + " loss not implemented!")
+        raise NotImplementedError(args.loss_type + " loss not implemented!")
 
     if args.optimizer.lower() == 'sdg':
         optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
-    elif args.optimizer.lower() == 'adam' :
+    elif args.optimizer.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
     else:
-        raise Exception("Invalid optimizer option".format(args.optimizer))    
-    
+        raise Exception("Invalid optimizer option".format(args.optimizer))
+
     for epoch in range(args.epochs):
         if epoch % args.validevery == 0:
             print("RUNNING VALIDATION AT EPOCH", epoch)
@@ -96,6 +93,7 @@ def main():
     trainpath = args.train_path
     testdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
     test(testdb, args.test_path)
+
 
 def train(epoch, loader, model, opt, crit, loss):
     print("Epoch", str(epoch))
@@ -114,30 +112,31 @@ def train(epoch, loader, model, opt, crit, loss):
 
 
 def create_database(size, dbtype, transforms, model, path, saveto=None):
-
     if dbtype == "Base":
-      db = BaseDatabase(model, path, transforms, size=size, saveto=saveto)
-      return db
+        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto)
+        return db
     else:
-      raise NotImplementedError(dbtype + " database not implemented!")
+        raise NotImplementedError(dbtype + " database not implemented!")
+
 
 def test(db, test_path):
     # Retrieval with a query image
     category_matches = 0
+    total_queries = 0
     with torch.no_grad():
         for f in os.listdir(test_path):
             # query/test image
-            qimg = os.listdir(os.path.join(test_path,f))[0]
-            print("CLASS",f,".... IMG",qimg)
-            im = Image.open(os.path.join(test_path,f, qimg))
+            qimg = os.listdir(os.path.join(test_path, f))[0]
+            total_queries += 1
+            print("CLASS", f, ".... IMG", qimg)
+            im = Image.open(os.path.join(test_path, f, qimg))
             I = db.search(im, 5)
             print("Retrieved Image: {}".format(db.im_indices[I[0][0]]))
-            if db.im_indices[I[0][0]].split("/")[3] == f:
-                print("Found a match from", qimg, "class", f )
+            if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
+                print("Found a match from", qimg, "class", f)
                 category_matches += 1
-    print("CATEGORY MATCHES: ", category_matches)
+    print("CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches/total_queries))
 
 
 if __name__ == '__main__':
     main()
-
