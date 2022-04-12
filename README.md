@@ -1,7 +1,7 @@
 # ElusiveImages
 
 ## QUICK SETUP
-https://colab.research.google.com/drive/1vh8OMiXm0jaTRjS--0TKvwNM-ycQHtqq#scrollTo=Sv2hfxNoUiff
+https://colab.research.google.com/drive/1Ze1iE7bdXC-O8N3N7-sw69DlPGmwu_-p
 With the above notebook...
 File -> save a copy in drive
 The first time you do this, you will need to clone the repo to your google drive account. Follow the first two cells in the GITHUB section for this. You will then need to download the data. Follow the GETTING THE DATA section.
