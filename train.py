@@ -10,7 +10,7 @@ import yaml
 from PIL import Image
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
-
+from pytorch_pretrained_vit import ViT
 from database import BaseDatabase
 from dataset import TripletData
 from loss import TripletLoss
@@ -41,6 +41,8 @@ def main():
     if args.model == 'ResNet':
         # model = resnet32()
         model = tvmodels.resnet18()
+    elif args.model == 'ViT':
+        model = ViT('B_16_imagenet1k', pretrained=True)
     else:
         raise NotImplementedError(args.model + " model not implemented!")
     if args.dataset == 'TripletData':

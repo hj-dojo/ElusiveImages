@@ -1,0 +1,26 @@
+Train:
+  batch_size: 4
+  learning_rate: 0.001
+  reg: 0.0005
+  epochs: 20
+  momentum: .9
+  validevery: 100
+  train_path: 'dataset/flowers/train'
+  test_path: 'dataset/flowers/test'
+  val_path: 'dataset/flowers/test'
+  optimizer: 'adam'
+
+
+network:
+  model: 'ViT'
+
+data:
+  data: 'dataset/flowers'
+  img_h: 384
+  img_w: 384
+  
+loss:
+  loss_type: 'TripletLoss'
+
+dataset:
+  dataset: 'TripletData'
