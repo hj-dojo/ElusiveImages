@@ -16,7 +16,7 @@ class BaseDatabase:
             self.db = faiss.IndexFlatL2(size)
             self.__build_db__(saveto)
         else:
-            self.db = faiss.deserialize_index(np.load('db'))
+            self.db = faiss.deserialize_index(np.load(db))
         
     def __build_db__(self, saveto):
         with torch.no_grad():
