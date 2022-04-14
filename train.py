@@ -66,7 +66,7 @@ def main():
     else:
         raise NotImplementedError(args.dataset + " dataset not implemented!")
 
-    if torch.cuda.is_available:
+    if torch.cuda.is_available():
         model = model.cuda()
 
     if args.loss_type == 'TripletLoss':
@@ -98,11 +98,12 @@ def main():
 
 
 def train(epoch, loader, model, opt, crit, loss):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Epoch", str(epoch))
     for data in tqdm(loader):
         opt.zero_grad()
         x1, x2, x3 = data
-        e1, e2, e3 = model(x1.to('cuda')), model(x2.to('cuda')), model(x3.to('cuda'))
+        e1, e2, e3 = model(x1.to(device)), model(x2.to(device)), model(x3.to(device))
         l = crit(e1, e2, e3)
         l.backward()
         opt.step()

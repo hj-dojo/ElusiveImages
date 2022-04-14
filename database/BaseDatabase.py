@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 import glob
 
+
 class BaseDatabase:
     def __init__(self, model, folder, transforms, imgdims=(224, 224), db=None, saveto=None, size=1000):
         self.model = model
@@ -12,6 +13,7 @@ class BaseDatabase:
         self.im_indices = []
         self.transforms = transforms
         self.w, self.h = imgdims
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         if db is None:
             self.db = faiss.IndexFlatL2(size)
             self.__build_db__(saveto)
@@ -23,7 +25,7 @@ class BaseDatabase:
             for f in glob.glob(os.path.join(self.folder, '*/*')):
                 img = Image.open(f)
                 img = img.resize((self.w, self.h))
-                img = torch.tensor([self.transforms(img).numpy()]).cuda()
+                img = torch.tensor([self.transforms(img).numpy()]).to(self.device)
                 embedding = self.model(img)
                 embedding = np.array([embedding[0].cpu().numpy()])
                 self.db.add(embedding)
@@ -34,7 +36,7 @@ class BaseDatabase:
     def search(self, input, k):
         with torch.no_grad():
           input = input.resize((self.w, self.h))
-          input = torch.tensor([self.transforms(input).numpy()]).cuda()
+          input = torch.tensor([self.transforms(input).numpy()]).to(self.device)
           input = self.model(input).cpu().numpy()
           _, I = self.db.search(input, k)
         return I

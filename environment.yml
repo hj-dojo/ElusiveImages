@@ -9,6 +9,7 @@ dependencies:
   - scipy
   - future
   - pip
+  - tqdm=4.64
   - faiss=1.7.2
   - faiss-cpu=1.7.2
   - pytorch=1.9.0
