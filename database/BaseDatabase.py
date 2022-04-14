@@ -25,9 +25,9 @@ class BaseDatabase:
             for f in glob.glob(os.path.join(self.folder, '*/*')):
                 img = Image.open(f)
                 img = img.resize((self.w, self.h))
-                img = torch.tensor([self.transforms(img).numpy()]).to(self.device)
+                img = torch.unsqueeze(self.transforms(img), 0).to(self.device)
                 embedding = self.model(img)
-                embedding = np.array([embedding[0].cpu().numpy()])
+                embedding = embedding.cpu().numpy()
                 self.db.add(embedding)
                 self.im_indices.append(f)
         if saveto is not None:
