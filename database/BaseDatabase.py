@@ -21,6 +21,8 @@ class BaseDatabase:
             self.db = faiss.deserialize_index(np.load(db))
         
     def __build_db__(self, saveto):
+        print('building database')
+        self.model.eval()
         with torch.no_grad():
             for f in glob.glob(os.path.join(self.folder, '*/*')):
                 img = Image.open(f)
