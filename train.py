@@ -4,6 +4,7 @@ import pathlib
 
 import numpy as np
 import torch
+torch.cuda.empty_cache()
 import torchvision.models as tvmodels
 import torchvision.transforms as transforms
 import yaml
@@ -20,11 +21,11 @@ parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
 # Setting seed value to reproduce results
-torch.manual_seed(1)
-import random;
-
-random.seed(1)
-np.random.seed(1)
+# torch.manual_seed(1)
+# import random;
+#
+# random.seed(1)
+# np.random.seed(1)
 
 
 def main():
@@ -135,15 +136,15 @@ def test(db, test_path):
     with torch.no_grad():
         for f in os.listdir(test_path):
             # query/test image
-            qimg = os.listdir(os.path.join(test_path, f))[0]
-            total_queries += 1
-            print("CLASS", f, ".... IMG", qimg)
-            im = Image.open(os.path.join(test_path, f, qimg))
-            I = db.search(im, 5)
-            print("Retrieved Image: {}".format(db.im_indices[I[0][0]]))
-            if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
-                print("Found a match from", qimg, "class", f)
-                category_matches += 1
+            qimgs = os.listdir(os.path.join(test_path, f))
+            for qimg in qimgs:
+                total_queries += 1
+                im = Image.open(os.path.join(test_path, f, qimg))
+                I = db.search(im, 5)
+                print("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
+                if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
+                    print("Found a match from", qimg, "class", f)
+                    category_matches += 1
     print("CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches/total_queries))
 
 
