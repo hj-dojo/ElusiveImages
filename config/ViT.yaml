@@ -18,6 +18,8 @@ data:
   data: 'dataset/flowers'
   img_h: 384
   img_w: 384
+  faiss_db: 'vitdb'
+  save_db: True
   
 loss:
   loss_type: 'TripletLoss'

@@ -19,6 +19,7 @@ class BaseDatabase:
             self.__build_db__(saveto)
         else:
             self.db = faiss.deserialize_index(np.load(db))
+            self.load_im_indices()
         
     def __build_db__(self, saveto):
         print('building database')
@@ -46,6 +47,11 @@ class BaseDatabase:
     def save(self, filename):
         serialized = faiss.serialize_index(self.db)
         np.save(filename+".npy", serialized)
+
+    def load_im_indices(self):
+          for f in glob.glob(os.path.join(self.folder, '*/*')):
+              self.im_indices.append(f)
+
 
 
   

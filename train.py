@@ -81,11 +81,17 @@ def main():
     else:
         raise Exception("Invalid optimizer option".format(args.optimizer))
 
+    v = vars(args)
     for epoch in range(args.epochs):
         if epoch % args.validevery == 0:
             print("RUNNING VALIDATION AT EPOCH", epoch)
             trainpath = args.train_path
-            valdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
+            if epoch == 0 and 'save_db' in v and args.save_db == True:
+                valdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto=args.faiss_db)
+            elif epoch == 0 and 'faiss_db' in v:
+                valdb = create_database(1000, 'Base', val_transforms, model, trainpath, npy=args.faiss_db+'.npy')
+            else:
+                valdb = create_database(1000, 'Base', val_transforms, model, trainpath)
             test(valdb, args.val_path)
         loss = 0.0
         model.train()
@@ -114,9 +120,9 @@ def train(epoch, loader, model, opt, crit, loss):
     return loss
 
 
-def create_database(size, dbtype, transforms, model, path, saveto=None):
+def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
     if dbtype == "Base":
-        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto)
+        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto, db=npy)
         return db
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
