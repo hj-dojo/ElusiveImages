@@ -1,3 +1,6 @@
+# from here: https://github.com/jeonsworld/MLP-Mixer-Pytorch
+
+
 # MLP-Mixer
 
 Pytorch reimplementation of [Google's repository for the MLP-Mixer](https://github.com/google-research/vision_transformer/tree/linen) (Not yet updated on the master branch) that was released with the paper [MLP-Mixer: An all-MLP Architecture for Vision](https://arxiv.org/abs/2105.01601) by Ilya Tolstikhin, Neil Houlsby, Alexander Kolesnikov, Lucas Beyer, Xiaohua Zhai, Thomas Unterthiner, Jessica Yung, Daniel Keysers, Jakob Uszkoreit, Mario Lucic, Alexey Dosovitskiy.
