@@ -3,3 +3,4 @@ __pycache__
 .idea
 *tgz
 *jpg
+MLPMixer/Mixer-B_16.npz
