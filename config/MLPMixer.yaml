@@ -9,11 +9,12 @@ Train:
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
   optimizer: 'adam'
-  data_size: 1000
+  pretrained_path: 'MLPMixer/Mixer-B_16.npz'
+  data_size: 768
 
 
 network:
-  model: 'ResNet'
+  model: 'MLPMixer'
 
 data:
   data: 'dataset/flowers'

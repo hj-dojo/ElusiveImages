@@ -9,6 +9,7 @@ Train:
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
   optimizer: 'adam'
+  data_size: 1000
 
 
 network:
