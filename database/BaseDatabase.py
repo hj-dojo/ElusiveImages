@@ -19,15 +19,18 @@ class BaseDatabase:
             self.__build_db__(saveto)
         else:
             self.db = faiss.deserialize_index(np.load(db))
+            self.load_im_indices()
         
     def __build_db__(self, saveto):
+        print('building database')
+        self.model.eval()
         with torch.no_grad():
             for f in glob.glob(os.path.join(self.folder, '*/*')):
                 img = Image.open(f)
                 img = img.resize((self.w, self.h))
-                img = torch.tensor([self.transforms(img).numpy()]).to(self.device)
+                img = torch.unsqueeze(self.transforms(img), 0).to(self.device)
                 embedding = self.model(img)
-                embedding = np.array([embedding[0].cpu().numpy()])
+                embedding = embedding.cpu().numpy()
                 self.db.add(embedding)
                 self.im_indices.append(f)
         if saveto is not None:
@@ -44,6 +47,11 @@ class BaseDatabase:
     def save(self, filename):
         serialized = faiss.serialize_index(self.db)
         np.save(filename+".npy", serialized)
+
+    def load_im_indices(self):
+          for f in glob.glob(os.path.join(self.folder, '*/*')):
+              self.im_indices.append(f)
+
 
 
   
