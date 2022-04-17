@@ -111,6 +111,16 @@ def main():
         optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
     elif args.optimizer.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
+    elif args.optimizer.lower() == 'feature_extractor':
+      for param in model.parameters():
+        param.requires_grad = False
+      model.fc = nn.Linear(model.fc.in_features, 1000, device='cuda')
+
+      params_to_update = []
+      for param in model.parameters():
+        if param.requires_grad == True:
+          params_to_update.append(param)
+      optimizer = torch.optim.Adam(params_to_update, args.learning_rate)
     else:
         raise Exception("Invalid optimizer option".format(args.optimizer))
 
