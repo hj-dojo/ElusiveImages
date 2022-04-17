@@ -1,6 +1,7 @@
 import argparse
 import os
 import pathlib
+import random
 
 import numpy as np
 import torch
@@ -24,15 +25,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
-# Setting seed value to reproduce results
-# torch.manual_seed(1)
-# import random;
-
-# random.seed(1)
-# np.random.seed(1)
-
-
 def main():
+
+    set_seed()
     global args
     args = parser.parse_args()
     with open(args.config) as f:
@@ -86,12 +81,14 @@ def main():
                                                transforms.RandomHorizontalFlip(),
                                                transforms.RandomRotation(10),
                                                transforms.ToTensor(),
-                                               transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))])
+                                               transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                    std=[0.229, 0.224, 0.225])])
 
         val_transforms = transforms.Compose([
             transforms.Resize((args.img_w, args.img_h)),
             transforms.ToTensor(),
-            transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])])
         val_dataset = SiameseData(args.train_path, val_transforms)
         train_dataset = SiameseData(args.train_path, train_transforms)
 
@@ -119,7 +116,7 @@ def main():
 
     v = vars(args)
     for epoch in range(args.epochs):
-        if epoch != 0 and epoch % args.validevery == 0:
+        if epoch % args.validevery == 0:
             print("RUNNING VALIDATION AT EPOCH", epoch)
             trainpath = args.train_path
             if epoch == 0 and 'save_db' in v and args.save_db == True:
@@ -143,6 +140,12 @@ def main():
     test(testdb, args.test_path)
 
 
+def set_seed():
+    # Setting seed value to reproduce results
+    torch.manual_seed(1)
+    random.seed(1)
+
+
 def train_siamese(epoch, loader, model, opt, criterion):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Epoch", str(epoch))
@@ -152,12 +155,13 @@ def train_siamese(epoch, loader, model, opt, criterion):
         img0, img1, label = data
         img0, img1, label = img0.to(device), img1.to(device), label.to(device)
         opt.zero_grad()
-        output1, output2 = model(img0, img1)
-        loss = criterion(output1, output2, label)
+        output0, output1 = model(img0.to(device)), model(img1.to(device))
+        loss = criterion(output0, output1, label)
         loss.backward()
         opt.step()
         cum_loss += loss
     return cum_loss
+
 
 def train(epoch, loader, model, opt, crit, loss):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
