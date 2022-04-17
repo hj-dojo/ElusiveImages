@@ -1,0 +1,27 @@
+Train:
+  batch_size: 16
+  learning_rate: 0.001
+  reg: 0.0005
+  epochs: 20
+  momentum: .9
+  validevery: 100
+  train_path: 'dataset/flowers/train'
+  test_path: 'dataset/flowers/test'
+  val_path: 'dataset/flowers/test'
+  optimizer: 'adam'
+
+
+network:
+  model: 'SiameseNet'
+  backbone: 'vit_b_32'
+
+data:
+  data: 'dataset/flowers'
+  img_h: 224
+  img_w: 224
+  
+loss:
+  loss_type: 'ContrastiveLoss'
+
+dataset:
+  dataset: 'SiameseData'

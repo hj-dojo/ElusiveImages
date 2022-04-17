@@ -1,4 +1,3 @@
-from numpy import positive
 from torch.utils.data import Dataset
 import os
 from PIL import Image
