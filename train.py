@@ -12,8 +12,11 @@ from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
 from pytorch_pretrained_vit import ViT
 from database import BaseDatabase
+from models import SiameseNet
 from dataset import TripletData
+from dataset import SiameseData
 from loss import TripletLoss
+from loss import ContrastiveLoss
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
@@ -43,6 +46,12 @@ def main():
         model = tvmodels.resnet18()
     elif args.model == 'ViT':
         model = ViT('B_16_imagenet1k', pretrained=True)
+    elif args.model == 'SiameseNet':
+        if 'backbone' in config:
+            backbone = args.backbone
+        else:
+            backbone = 'resnet18'
+        model = SiameseNet(backbone)
     else:
         raise NotImplementedError(args.model + " model not implemented!")
     if args.dataset == 'TripletData':
@@ -63,6 +72,23 @@ def main():
 
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+    elif args.dataset == 'SiameseData':
+        train_transforms = transforms.Compose([transforms.Resize((args.img_w, args.img_h)),
+                                               transforms.RandomResizedCrop(100),
+                                               transforms.RandomHorizontalFlip(),
+                                               transforms.RandomRotation(10),
+                                               transforms.ToTensor(),
+                                               transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))])
+
+        val_transforms = transforms.Compose([
+            transforms.Resize((args.img_w, args.img_h)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))])
+        val_dataset = SiameseData(args.train_path, val_transforms)
+        train_dataset = SiameseData(args.train_path, train_transforms)
+
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     else:
         raise NotImplementedError(args.dataset + " dataset not implemented!")
 
@@ -71,6 +97,8 @@ def main():
 
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
+    elif args.loss_type == 'ContrastiveLoss':
+        criterion = ContrastiveLoss()
     else:
         raise NotImplementedError(args.loss_type + " loss not implemented!")
 
@@ -82,20 +110,38 @@ def main():
         raise Exception("Invalid optimizer option".format(args.optimizer))
 
     for epoch in range(args.epochs):
-        if epoch % args.validevery == 0:
+        if epoch != 0 and epoch % args.validevery == 0:
             print("RUNNING VALIDATION AT EPOCH", epoch)
             trainpath = args.train_path
             valdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
             test(valdb, args.val_path)
         loss = 0.0
         model.train()
-        loss = train(epoch, train_loader, model, optimizer, criterion, loss)
+        if args.model == 'SiameseNet':
+            train_siamese(epoch, train_loader, model, optimizer, criterion, loss)
+        else:
+            train(epoch, train_loader, model, optimizer, criterion, loss)
+        print("epoch {0}: Loss = {1}", epoch, loss)
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
     trainpath = args.train_path
     testdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
     test(testdb, args.test_path)
 
+def train_siamese(epoch, loader, model, opt, criterion, cum_loss):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Epoch", str(epoch))
+    for data in tqdm(loader):
+        opt.zero_grad()
+        img0, img1, label = data
+        img0, img1, label = img0.to(device), img1.to(device), label.to(device)
+        opt.zero_grad()
+        output1, output2 = model(img0, img1)
+        loss = criterion(output1, output2, label)
+        loss.backward()
+        opt.step()
+        cum_loss += loss
+    return cum_loss
 
 def train(epoch, loader, model, opt, crit, loss):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
