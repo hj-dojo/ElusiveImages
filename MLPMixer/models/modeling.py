@@ -1,6 +1,8 @@
 import copy
-from os import XATTR_SIZE_MAX
-
+try:
+    from os import XATTR_SIZE_MAX
+except ImportError:
+    pass
 import torch
 
 from os.path import join as pjoin

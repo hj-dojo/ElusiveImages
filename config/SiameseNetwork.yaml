@@ -9,6 +9,7 @@ Train:
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
   optimizer: 'adam'
+  data_size: 1000
 
 
 network:
@@ -19,6 +20,8 @@ data:
   data: 'dataset/flowers'
   img_h: 224
   img_w: 224
+  faiss_db: 'siamesedb'
+  save_db: True
   
 loss:
   loss_type: 'ContrastiveLoss'
