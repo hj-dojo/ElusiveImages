@@ -1,14 +1,15 @@
 Train:
-  batch_size: 4
+  batch_size: 1
   learning_rate: 0.001
   reg: 0.0005
-  epochs: 20
+  epochs: 10
   momentum: .9
   validevery: 100
   train_path: 'dataset/flowers/train'
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
   optimizer: 'adam'
+  data_size: 1000
 
 
 network:
@@ -18,6 +19,8 @@ data:
   data: 'dataset/flowers'
   img_h: 384
   img_w: 384
+  faiss_db: 'vitdb'
+  save_db: True
   
 loss:
   loss_type: 'TripletLoss'

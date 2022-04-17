@@ -3,3 +3,7 @@ __pycache__
 .idea
 *tgz
 *jpg
+MLPMixer/Mixer-B_16.npz
+MLPMixer/models/__pycache__/*
+MLPMixer/models/.ipynb_checkpoints/*
+MLPMixer/img/*

@@ -4,6 +4,7 @@ import pathlib
 
 import numpy as np
 import torch
+torch.cuda.empty_cache()
 import torchvision.models as tvmodels
 import torchvision.transforms as transforms
 import yaml
@@ -17,17 +18,18 @@ from dataset import TripletData
 from dataset import SiameseData
 from loss import TripletLoss
 from loss import ContrastiveLoss
+from MLPMixer.models.modeling import MlpMixer, CONFIGS
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
 # Setting seed value to reproduce results
-torch.manual_seed(1)
-import random;
+# torch.manual_seed(1)
+# import random;
 
-random.seed(1)
-np.random.seed(1)
+# random.seed(1)
+# np.random.seed(1)
 
 
 def main():
@@ -46,12 +48,18 @@ def main():
         model = tvmodels.resnet18()
     elif args.model == 'ViT':
         model = ViT('B_16_imagenet1k', pretrained=True)
+        # model = torch.quantization.quantize_dynamic(model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8)
     elif args.model == 'SiameseNet':
         if 'backbone' in config:
             backbone = args.backbone
         else:
             backbone = 'resnet18'
         model = SiameseNet(backbone)
+    elif args.model == 'MLPMixer':
+        # TO USE DOWNLOAD PRETRAINED MODEL: wget https://storage.googleapis.com/mixer_models/imagenet21k/Mixer-B_16.npz
+        c = CONFIGS['Mixer-B_16-21k']
+        model = MlpMixer(c, args.img_h, num_classes=17, patch_size=16, zero_head=True)
+        model.load_from(np.load(args.pretrained_path))
     else:
         raise NotImplementedError(args.model + " model not implemented!")
     if args.dataset == 'TripletData':
@@ -109,11 +117,17 @@ def main():
     else:
         raise Exception("Invalid optimizer option".format(args.optimizer))
 
+    v = vars(args)
     for epoch in range(args.epochs):
         if epoch != 0 and epoch % args.validevery == 0:
             print("RUNNING VALIDATION AT EPOCH", epoch)
             trainpath = args.train_path
-            valdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
+            if epoch == 0 and 'save_db' in v and args.save_db == True:
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto=args.faiss_db)
+            elif epoch == 0 and 'faiss_db' in v:
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, npy=args.faiss_db+'.npy')
+            else:
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath)
             test(valdb, args.val_path)
         loss = 0.0
         model.train()
@@ -125,7 +139,7 @@ def main():
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
     trainpath = args.train_path
-    testdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
+    testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto="testsave")
     test(testdb, args.test_path)
 
 
@@ -162,32 +176,41 @@ def train(epoch, loader, model, opt, crit, loss):
     return loss
 
 
-def create_database(size, dbtype, transforms, model, path, saveto=None):
+def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
     if dbtype == "Base":
-        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto)
+        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto, db=npy)
         return db
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
 
 
-def test(db, test_path):
+def test(db, test_path, full_test=False):
     # Retrieval with a query image
     category_matches = 0
     total_queries = 0
     with torch.no_grad():
         for f in os.listdir(test_path):
-            # query/test image
-            qimg = os.listdir(os.path.join(test_path, f))[0]
-            total_queries += 1
-            print("CLASS", f, ".... IMG", qimg)
-            im = Image.open(os.path.join(test_path, f, qimg))
-            I = db.search(im, 5)
-            print("Retrieved Image: {}".format(db.im_indices[I[0][0]]))
-            if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
-                print("Found a match from", qimg, "class", f)
-                category_matches += 1
-    print("CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches/total_queries))
-
+            if full_test:
+                qimgs = os.listdir(os.path.join(test_path, f))
+                for qimg in qimgs:
+                    total_queries += 1
+                    im = Image.open(os.path.join(test_path, f, qimg))
+                    I = db.search(im, 5)
+                    print("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
+                    if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
+                        print("Found a match from", qimg, "class", f)
+                        category_matches += 1
+            else:
+                qimg = os.listdir(os.path.join(test_path, f))[0]
+                total_queries += 1
+                print("CLASS", f, ".... IMG", qimg)
+                im = Image.open(os.path.join(test_path, f, qimg))
+                I = db.search(im, 5)
+                print("Retrieved Image: {}".format(db.im_indices[I[0][0]]))
+                if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
+                    print("Found a match from", qimg, "class", f)
+                    category_matches += 1
+    print("CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches/total_queries))    
 
 if __name__ == '__main__':
     main()
