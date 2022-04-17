@@ -131,7 +131,7 @@ def main():
         if args.model == 'SiameseNet':
             loss = train_siamese(epoch, train_loader, model, optimizer, criterion)
         else:
-            train(epoch, train_loader, model, optimizer, criterion, loss)
+            loss = train(epoch, train_loader, model, optimizer, criterion)
         print("epoch {0}: Loss = {1}".format(epoch, loss))
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
@@ -163,9 +163,10 @@ def train_siamese(epoch, loader, model, opt, criterion):
     return cum_loss
 
 
-def train(epoch, loader, model, opt, crit, loss):
+def train(epoch, loader, model, opt, crit):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Epoch", str(epoch))
+    loss = 0
     for data in tqdm(loader):
         opt.zero_grad()
         x1, x2, x3 = data
@@ -176,9 +177,7 @@ def train(epoch, loader, model, opt, crit, loss):
         loss += l
         # batch_map = compute_map(out, target)
         # print("BATCH MAP IS: {batch_map}").format(batch_map)
-    print("Current loss is", loss)
     return loss
-
 
 def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
     if dbtype == "Base":
