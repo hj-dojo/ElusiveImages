@@ -118,19 +118,21 @@ def main():
         loss = 0.0
         model.train()
         if args.model == 'SiameseNet':
-            train_siamese(epoch, train_loader, model, optimizer, criterion, loss)
+            loss = train_siamese(epoch, train_loader, model, optimizer, criterion)
         else:
             train(epoch, train_loader, model, optimizer, criterion, loss)
-        print("epoch {0}: Loss = {1}", epoch, loss)
+        print("epoch {0}: Loss = {1}".format(epoch, loss))
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
     trainpath = args.train_path
     testdb = create_database(1000, 'Base', val_transforms, model, trainpath, saveto="testsave")
     test(testdb, args.test_path)
 
-def train_siamese(epoch, loader, model, opt, criterion, cum_loss):
+
+def train_siamese(epoch, loader, model, opt, criterion):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("Epoch", str(epoch))
+    cum_loss = 0
     for data in tqdm(loader):
         opt.zero_grad()
         img0, img1, label = data
