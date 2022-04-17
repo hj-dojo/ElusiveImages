@@ -2,13 +2,13 @@ Train:
   batch_size: 1
   learning_rate: 0.001
   reg: 0.0005
-  epochs: 10
+  epochs: 0
   momentum: .9
   validevery: 100
   train_path: 'dataset/flowers/train'
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
-  optimizer: 'adam'
+  optimizer: 'feature_extractor'
   data_size: 1000
 
 
@@ -27,3 +27,7 @@ loss:
 
 dataset:
   dataset: 'TripletData'
+
+Misc:
+  # Supported log levels: critical, error, warning, info, debug
+  loglevel: 'debug'
