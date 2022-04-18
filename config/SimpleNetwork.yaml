@@ -25,3 +25,7 @@ loss:
 
 dataset:
   dataset: 'TripletData'
+
+Misc:
+  # Supported log levels: critical, error, warning, info, debug
+  loglevel: 'debug'
