@@ -30,7 +30,8 @@ parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
 # Seed value to reproduce results
-seed_value = 123456
+seed_value = 123456 # acc: 0.9963
+seed_value = 123 # acc: 0.9963
 
 
 def main():
@@ -44,6 +45,7 @@ def main():
             setattr(args, k, v)
 
     log.basicConfig(level=args.loglevel.upper(), format='%(message)s')
+    log.info("Args: {}".format(args))
 
     if args.mode.lower() != 'train':
         raise NotImplementedError('Only train mode implemented so far')
@@ -105,7 +107,7 @@ def main():
     g = torch.Generator()
     g.manual_seed(0)
 
-    train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
+    train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path, cats=len(os.listdir(args.train_path)))
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
 
     # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
@@ -126,6 +128,7 @@ def main():
     elif args.optimizer.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
     elif args.optimizer.lower() == 'feature_extractor':
+        log.info("With optimizer mode set to {}, final FC layer is being randomly initialized again for training".format(args.optimizer))
         for param in model.parameters():
             param.requires_grad = False
         model.fc = nn.Linear(model.fc.in_features, 1000, device='cuda')
@@ -245,6 +248,7 @@ def test(db, test_path, full_test=True):
                 if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
                     log.debug("Found a match from {} class {}".format(qimg, f))
                     category_matches += 1
+    log.info("Args: {}".format(args))
     log.info(
         "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches / total_queries))
 
