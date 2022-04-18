@@ -148,12 +148,12 @@ def main():
         if epoch % args.validevery == 0:
             log.info("RUNNING VALIDATION AT EPOCH {}".format(epoch))
             if epoch == 0 and 'save_db' in v and args.save_db == True:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto=args.faiss_db)
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h, saveto=args.faiss_db)
             elif epoch == 0 and 'faiss_db' in v:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath,
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h,
                                         npy=args.faiss_db + '.npy')
             else:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath)
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h)
             test(valdb, args.val_path)
         model.train()
         if args.model == 'SiameseNet':
@@ -166,7 +166,7 @@ def main():
     # ---- Test ---- #
     # Set to eval mode
     model.eval()
-    testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto="testsave")
+    testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h, saveto="testsave")
     test(testdb, args.test_path)
 
 
@@ -227,9 +227,9 @@ def train(epoch, loader, model, opt, crit):
     return loss
 
 
-def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
+def create_database(size, dbtype, transforms, model, path, img_w, img_h, saveto=None, npy=None):
     if dbtype == "Base":
-        db = BaseDatabase(model, path, transforms, imgdims=(args.img_w, args.img_h), size=size, saveto=saveto, db=npy)
+        db = BaseDatabase(model, path, transforms, imgdims=(img_w, img_h), size=size, saveto=saveto, db=npy)
         return db
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
