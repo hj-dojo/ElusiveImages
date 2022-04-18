@@ -229,7 +229,7 @@ def train(epoch, loader, model, opt, crit):
 
 def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
     if dbtype == "Base":
-        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto, db=npy)
+        db = BaseDatabase(model, path, transforms, imgdims=(args.img_w, args.img_h), size=size, saveto=saveto, db=npy)
         return db
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
