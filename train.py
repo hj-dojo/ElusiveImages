@@ -30,7 +30,8 @@ parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
 # Seed value to reproduce results
-seed_value = 123456
+seed_value = 123456 # acc: 0.9963
+seed_value = 123 # acc: 0.9963
 
 
 def main():
@@ -44,6 +45,7 @@ def main():
             setattr(args, k, v)
 
     log.basicConfig(level=args.loglevel.upper(), format='%(message)s')
+    log.info("Args: {}".format(args))
 
     if args.mode.lower() != 'train':
         raise NotImplementedError('Only train mode implemented so far')
@@ -117,7 +119,7 @@ def main():
 
     g = torch.Generator()
     g.manual_seed(0)
-
+    
     # ----- Loss ----- #
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
@@ -132,6 +134,7 @@ def main():
     elif args.optimizer.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
     elif args.optimizer.lower() == 'feature_extractor':
+        log.info("With optimizer mode set to {}, final FC layer is being randomly initialized again for training".format(args.optimizer))
         for param in model.parameters():
             param.requires_grad = False
         model.fc = nn.Linear(model.fc.in_features, 1000, device='cuda')
@@ -151,12 +154,12 @@ def main():
         if epoch % args.validevery == 0:
             log.info("RUNNING VALIDATION AT EPOCH {}".format(epoch))
             if epoch == 0 and 'save_db' in v and args.save_db == True:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto=args.faiss_db)
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h, saveto=args.faiss_db)
             elif epoch == 0 and 'faiss_db' in v:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath,
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h,
                                         npy=args.faiss_db + '.npy')
             else:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath)
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h)
             test(valdb, args.val_path)
         model.train()
         if args.model == 'SiameseNet':
@@ -169,7 +172,7 @@ def main():
     # ---- Test ---- #
     # Set to eval mode
     model.eval()
-    testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto="testsave")
+    testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h, saveto="testsave")
     test(testdb, args.test_path)
 
 
@@ -230,9 +233,9 @@ def train(epoch, loader, model, opt, crit):
     return loss
 
 
-def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
+def create_database(size, dbtype, transforms, model, path, img_w, img_h, saveto=None, npy=None):
     if dbtype == "Base":
-        db = BaseDatabase(model, path, transforms, size=size, saveto=saveto, db=npy)
+        db = BaseDatabase(model, path, transforms, imgdims=(img_w, img_h), size=size, saveto=saveto, db=npy)
         return db
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
@@ -253,6 +256,7 @@ def test(db, test_path, full_test=True):
                 if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
                     log.debug("Found a match from {} class {}".format(qimg, f))
                     category_matches += 1
+    log.info("Args: {}".format(args))
     log.info(
         "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches / total_queries))
 
