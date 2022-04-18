@@ -2,9 +2,11 @@ import argparse
 import os
 import pathlib
 import random
+import sys
 
 import numpy as np
 import torch
+
 torch.cuda.empty_cache()
 import torchvision.models as tvmodels
 import torchvision.transforms as transforms
@@ -20,14 +22,19 @@ from dataset import SiameseData
 from loss import TripletLoss
 from loss import ContrastiveLoss
 from MLPMixer.models.modeling import MlpMixer, CONFIGS
+from torch import nn
+import logging as log
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
-def main():
+# Seed value to reproduce results
+seed_value = 123456
 
-    set_seed()
+
+def main():
+    set_seed(seed_value)
     global args
     args = parser.parse_args()
     with open(args.config) as f:
@@ -35,9 +42,13 @@ def main():
     for key in config:
         for k, v in config[key].items():
             setattr(args, k, v)
-    if args.mode != 'train':
+
+    log.basicConfig(level=args.loglevel.upper(), format='%(message)s')
+
+    if args.mode.lower() != 'train':
         raise NotImplementedError('Only train mode implemented so far')
 
+    # ----- Model ----- #
     if args.model == 'ResNet':
         # model = resnet32()
         model = tvmodels.resnet18()
@@ -57,6 +68,11 @@ def main():
         model.load_from(np.load(args.pretrained_path))
     else:
         raise NotImplementedError(args.model + " model not implemented!")
+
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+    # ----- Dataset ----- #
     if args.dataset == 'TripletData':
         train_transforms = transforms.Compose([
             transforms.Resize((args.img_w, args.img_h)),
@@ -69,12 +85,6 @@ def main():
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
-        # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
-        val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
-        train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
-
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     elif args.dataset == 'SiameseData':
         train_transforms = transforms.Compose([transforms.Resize((args.img_w, args.img_h)),
                                                transforms.RandomResizedCrop(100),
@@ -89,17 +99,20 @@ def main():
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])])
-        val_dataset = SiameseData(args.train_path, val_transforms)
-        train_dataset = SiameseData(args.train_path, train_transforms)
-
-        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     else:
         raise NotImplementedError(args.dataset + " dataset not implemented!")
 
-    if torch.cuda.is_available():
-        model = model.cuda()
+    g = torch.Generator()
+    g.manual_seed(0)
 
+    train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
+
+    # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
+    # val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
+    # val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
+
+    # ----- Loss ----- #
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
     elif args.loss_type == 'ContrastiveLoss':
@@ -107,50 +120,79 @@ def main():
     else:
         raise NotImplementedError(args.loss_type + " loss not implemented!")
 
+    # ----- Optimizer ----- #
     if args.optimizer.lower() == 'sdg':
         optimizer = torch.optim.SGD(model.parameters(), args.learning_rate, momentum=args.momentum)
     elif args.optimizer.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
+    elif args.optimizer.lower() == 'feature_extractor':
+        for param in model.parameters():
+            param.requires_grad = False
+        model.fc = nn.Linear(model.fc.in_features, 1000, device='cuda')
+
+        params_to_update = []
+        for param in model.parameters():
+            if param.requires_grad == True:
+                params_to_update.append(param)
+        optimizer = torch.optim.Adam(params_to_update, args.learning_rate)
     else:
         raise Exception("Invalid optimizer option".format(args.optimizer))
 
+    # ----- Train ----- #
     v = vars(args)
+    trainpath = args.train_path
     for epoch in range(args.epochs):
         if epoch % args.validevery == 0:
-            print("RUNNING VALIDATION AT EPOCH", epoch)
-            trainpath = args.train_path
+            log.info("RUNNING VALIDATION AT EPOCH {}".format(epoch))
             if epoch == 0 and 'save_db' in v and args.save_db == True:
                 valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto=args.faiss_db)
             elif epoch == 0 and 'faiss_db' in v:
-                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, npy=args.faiss_db+'.npy')
+                valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath,
+                                        npy=args.faiss_db + '.npy')
             else:
                 valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath)
             test(valdb, args.val_path)
-        loss = 0.0
         model.train()
         if args.model == 'SiameseNet':
             loss = train_siamese(epoch, train_loader, model, optimizer, criterion)
         else:
             loss = train(epoch, train_loader, model, optimizer, criterion)
-        print("epoch {0}: Loss = {1}".format(epoch, loss))
+        log.info("epoch {0}: Loss = {1}".format(epoch, loss))
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
+    # ---- Test ---- #
     # Set to eval mode
     model.eval()
-    trainpath = args.train_path
     testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto="testsave")
     test(testdb, args.test_path)
 
 
-def set_seed():
+def seed_worker(worker_id):
+    log.debug(worker_id)
+    worker_seed = torch.initial_seed() % 2 ** 32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
+
+def set_seed(seed_value):
+    # Don't use log info here, as logging level is not set when set_seed is called.
+    print("Setting seed value to {} for reproducing results".format(seed_value))
+    # CUDA Reproducibility: https://docs.nvidia.com/cuda/cublas/index.html#cublasApi_reproducibility
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":4096:8"
+
+    # Reproducibility: https://pytorch.org/docs/stable/notes/randomness.html
     # Setting seed value to reproduce results
-    torch.manual_seed(1)
-    random.seed(1)
+    os.environ['PYTHONHASHSEED'] = str(seed_value)
+    torch.manual_seed(seed_value)
+    random.seed(seed_value)
+    np.random.seed(seed_value)
+
+    torch.use_deterministic_algorithms(True)
 
 
 def train_siamese(epoch, loader, model, opt, criterion):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Epoch", str(epoch))
+    log.info("Epoch {}".format(epoch))
     cum_loss = 0
     for data in tqdm(loader):
         opt.zero_grad()
@@ -167,7 +209,7 @@ def train_siamese(epoch, loader, model, opt, criterion):
 
 def train(epoch, loader, model, opt, crit):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print("Epoch", str(epoch))
+    log.info("Epoch {}".format(epoch))
     loss = 0
     for data in tqdm(loader):
         opt.zero_grad()
@@ -178,8 +220,9 @@ def train(epoch, loader, model, opt, crit):
         opt.step()
         loss += l
         # batch_map = compute_map(out, target)
-        # print("BATCH MAP IS: {batch_map}").format(batch_map)
+        # log.info("BATCH MAP IS: {batch_map}").format(batch_map)
     return loss
+
 
 def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None):
     if dbtype == "Base":
@@ -189,33 +232,24 @@ def create_database(size, dbtype, transforms, model, path, saveto=None, npy=None
         raise NotImplementedError(dbtype + " database not implemented!")
 
 
-def test(db, test_path, full_test=False):
+def test(db, test_path, full_test=True):
     # Retrieval with a query image
     category_matches = 0
     total_queries = 0
     with torch.no_grad():
         for f in os.listdir(test_path):
-            if full_test:
-                qimgs = os.listdir(os.path.join(test_path, f))
-                for qimg in qimgs:
-                    total_queries += 1
-                    im = Image.open(os.path.join(test_path, f, qimg))
-                    I = db.search(im, 5)
-                    print("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
-                    if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
-                        print("Found a match from", qimg, "class", f)
-                        category_matches += 1
-            else:
-                qimg = os.listdir(os.path.join(test_path, f))[0]
+            qimgs = os.listdir(os.path.join(test_path, f)) if full_test else os.listdir(os.path.join(test_path, f))[:1]
+            for qimg in qimgs:
                 total_queries += 1
-                print("CLASS", f, ".... IMG", qimg)
                 im = Image.open(os.path.join(test_path, f, qimg))
                 I = db.search(im, 5)
-                print("Retrieved Image: {}".format(db.im_indices[I[0][0]]))
+                log.debug("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
                 if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
-                    print("Found a match from", qimg, "class", f)
+                    log.debug("Found a match from {} class {}".format(qimg, f))
                     category_matches += 1
-    print("CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches/total_queries))    
+    log.info(
+        "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches / total_queries))
+
 
 if __name__ == '__main__':
     main()
