@@ -85,6 +85,14 @@ def main():
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
+        train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker,
+                                  generator=g)
+
+        # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
+        # val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
+        # val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
+
     elif args.dataset == 'SiameseData':
         train_transforms = transforms.Compose([transforms.Resize((args.img_w, args.img_h)),
                                                transforms.RandomResizedCrop(100),
@@ -99,18 +107,16 @@ def main():
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])])
+        # val_dataset = SiameseData(args.train_path, val_transforms)
+        train_dataset = SiameseData(args.train_path, train_transforms)
+
+        train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        # val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
     else:
         raise NotImplementedError(args.dataset + " dataset not implemented!")
 
     g = torch.Generator()
     g.manual_seed(0)
-
-    train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
-
-    # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
-    # val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
-    # val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
 
     # ----- Loss ----- #
     if args.loss_type == 'TripletLoss':

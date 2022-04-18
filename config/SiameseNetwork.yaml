@@ -13,7 +13,7 @@ Train:
 
 network:
   model: 'SiameseNet'
-  backbone: 'vit_b_32'
+  backbone: 'vit_l_32'
   pretrain: False
 
 data:
@@ -28,3 +28,7 @@ loss:
 
 dataset:
   dataset: 'SiameseData'
+
+Misc:
+  # Supported log levels: critical, error, warning, info, debug
+  loglevel: 'info'
