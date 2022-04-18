@@ -62,7 +62,7 @@ def main():
             backbone = args.backbone
         else:
             backbone = 'resnet18'
-        model = SiameseNet(backbone)
+        model = SiameseNet(backbone, args.pretrain)
     elif args.model == 'MLPMixer':
         # TO USE DOWNLOAD PRETRAINED MODEL: wget https://storage.googleapis.com/mixer_models/imagenet21k/Mixer-B_16.npz
         c = CONFIGS['Mixer-B_16-21k']
@@ -164,6 +164,8 @@ def main():
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
     # ---- Test ---- #
+    # Set to eval mode
+    model.eval()
     testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, saveto="testsave")
     test(testdb, args.test_path)
 
