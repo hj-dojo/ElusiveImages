@@ -2,7 +2,7 @@ Train:
   batch_size: 1
   learning_rate: 0.001
   reg: 0.0005
-  epochs: 0
+  epochs: 40
   momentum: .9
   validevery: 100
   train_path: 'dataset/flowers/train'
@@ -17,8 +17,8 @@ network:
 
 data:
   data: 'dataset/flowers'
-  img_h: 384
-  img_w: 384
+  img_h: 224
+  img_w: 224
   faiss_db: 'vitdb'
   save_db: True
   
