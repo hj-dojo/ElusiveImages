@@ -22,13 +22,14 @@ train_data_path = os.path.join(path_to_organized_dataset, "train")
 test_data_path = os.path.join(path_to_organized_dataset, "test")
 
 # specify number of breeds to use. Total number of breeds 120
-num_breeds = 120
+num_breeds = 30
 
 # read the csv file
 df_labels = pd.read_csv(labels_csv)
 
 # check the total number of unique breed in our dataset file
 print("Total number of unique Dog Breeds :", len(df_labels.breed.unique()))
+print("Using {} Dog Breeds in current experiment".format(num_breeds))
 
 breed_dict_desc_order_of_cnt = OrderedDict(df_labels['breed'].value_counts())
 new_breed_list = list(breed_dict_desc_order_of_cnt.keys())[:num_breeds]
@@ -44,6 +45,8 @@ breed_img_data = df_labels.groupby('breed')['img_file'].apply(list).to_dict()
 # Organize the data
 # Note: least number of images for a dog breede is 66. To make dataset balanced picking  66 images for each breed.
 img_limit = len(breed_img_data[min(breed_img_data, key=lambda k: len(breed_img_data[k]))])
+
+img_limit = 30
 
 train_split_ratio = 0.8
 breed_to_num = {}
