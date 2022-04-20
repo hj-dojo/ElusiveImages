@@ -14,24 +14,32 @@ import yaml
 from PIL import Image
 from torch.utils.data import DataLoader
 from tqdm.notebook import tqdm
-from pytorch_pretrained_vit import ViT
 from database import BaseDatabase
 from models import SiameseNet
 from dataset import TripletData
-from dataset import SiameseData
 from loss import TripletLoss
 from loss import ContrastiveLoss
 from MLPMixer.models.modeling import MlpMixer, CONFIGS
 from torch import nn
 import logging as log
+from utils.MAP import compute_map
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
 parser.add_argument('--mode', default='train')
 
 # Seed value to reproduce results
-seed_value = 123456 # acc: 0.9963
-seed_value = 123 # acc: 0.9963
+seed_value = 111111
+
+
+
+class Identity(nn.Module):
+    def __init__(self):
+        super(Identity, self).__init__()
+        
+    def forward(self, x):
+        return x
 
 
 def main():
@@ -44,8 +52,33 @@ def main():
         for k, v in config[key].items():
             setattr(args, k, v)
 
-    log.basicConfig(level=args.loglevel.upper(), format='%(message)s')
-    log.info("Args: {}".format(args))
+    # log.basicConfig(level=args.loglevel.upper(), format='%(message)s')
+    log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}'.format(args.model.lower(),
+                                                                                       pathlib.Path(
+                                                                                           args.train_path).parts[1],
+                                                                                       args.loss_type.lower(),
+                                                                                       args.dataset.lower(),
+                                                                                       args.optimizer.lower(),
+                                                                                       args.epochs,
+                                                                                       str(args.learning_rate).replace(
+                                                                                           '.', '_'),
+                                                                                       str(args.momentum).replace('.',
+                                                                                                                  '_'),
+                                                                                       args.batch_size,
+                                                                                       args.img_w,
+                                                                                       args.img_h,
+                                                                                       seed_value)
+
+    log.basicConfig(
+        level=args.loglevel.upper(),
+        format="[%(levelname)s] %(message)s",
+        handlers=[
+            log.FileHandler("{}.txt".format(os.path.join(args.logdir, log_file_name))),
+            log.StreamHandler(sys.stdout)
+        ]
+    )
+
+    print("Args: {}, seed: {}".format(args, seed_value))
 
     if args.mode.lower() != 'train':
         raise NotImplementedError('Only train mode implemented so far')
@@ -55,7 +88,20 @@ def main():
         # model = resnet32()
         model = tvmodels.resnet18()
     elif args.model == 'ViT':
-        model = ViT('B_16_imagenet1k', pretrained=True)
+        model = tvmodels.vit_b_16(pretrained=True)
+
+        ###  FOR OTHER EXPERIMENTS
+        # model.encoder.layers.encoder_layer_11 = Identity()
+        # model.encoder.layers.encoder_layer_10 = Identity()
+        # model.encoder.layers.encoder_layer_9 = Identity()
+        # model.encoder.layers.encoder_layer_8 = Identity()
+        # model.encoder.layers.encoder_layer_7 = Identity()
+        # model.encoder.layers.encoder_layer_6 = Identity()
+        # model.encoder.layers.encoder_layer_5 = Identity()
+        # model.encoder.layers.encoder_layer_4 = Identity()
+        # model.encoder.layers.encoder_layer_3 = Identity()
+        # model.encoder.layers.encoder_layer_2 = Identity()
+        # model.encoder.layers.encoder_layer_1 = Identity()
         # model = torch.quantization.quantize_dynamic(model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8)
     elif args.model == 'SiameseNet':
         if 'backbone' in config:
@@ -74,7 +120,13 @@ def main():
     if torch.cuda.is_available():
         model = model.cuda()
 
+    g = torch.Generator()
+    g.manual_seed(0)
+
+
     # ----- Dataset ----- #
+    g = torch.Generator()
+    g.manual_seed(0)
     if args.dataset == 'TripletData':
         train_transforms = transforms.Compose([
             transforms.Resize((args.img_w, args.img_h)),
@@ -87,14 +139,14 @@ def main():
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)), ])
 
-        train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path)
+        train_dataset = TripletData(args.train_path, train_transforms, path=args.train_path,
+                                cats=len(os.listdir(args.train_path)))
         train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker,
-                                  generator=g)
+                              generator=g)
 
         # NOTE THIS IS SAME AS TEST, NEED A VAL DATASET
         # val_dataset = TripletData(args.train_path, val_transforms, path=args.test_path)
         # val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
-
     elif args.dataset == 'SiameseData':
         train_transforms = transforms.Compose([transforms.Resize((args.img_w, args.img_h)),
                                                transforms.RandomResizedCrop(100),
@@ -117,9 +169,10 @@ def main():
     else:
         raise NotImplementedError(args.dataset + " dataset not implemented!")
 
-    g = torch.Generator()
-    g.manual_seed(0)
+    # g = torch.Generator()
+    # g.manual_seed(0)
     
+
     # ----- Loss ----- #
     if args.loss_type == 'TripletLoss':
         criterion = TripletLoss()
@@ -134,11 +187,15 @@ def main():
     elif args.optimizer.lower() == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
     elif args.optimizer.lower() == 'feature_extractor':
-        log.info("With optimizer mode set to {}, final FC layer is being randomly initialized again for training".format(args.optimizer))
+        log.info(
+            "With optimizer mode set to {}, final FC layer is being randomly initialized again for training".format(
+                args.optimizer))
         for param in model.parameters():
             param.requires_grad = False
-        model.fc = nn.Linear(model.fc.in_features, 1000, device='cuda')
-
+        if args.model == 'ViT':
+          model.heads[0] = nn.Linear(model.heads[0].in_features, 1000, device='cuda')
+        else:
+          model.fc = nn.Linear(model.fc.in_features, 1000, device='cuda')
         params_to_update = []
         for param in model.parameters():
             if param.requires_grad == True:
@@ -150,6 +207,8 @@ def main():
     # ----- Train ----- #
     v = vars(args)
     trainpath = args.train_path
+    pre_train_accuray = 'NA'
+    loss_per_iter = []
     for epoch in range(args.epochs):
         if epoch % args.validevery == 0:
             log.info("RUNNING VALIDATION AT EPOCH {}".format(epoch))
@@ -159,21 +218,36 @@ def main():
                 valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h,
                                         npy=args.faiss_db + '.npy')
             else:
+            
                 valdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h)
-            test(valdb, args.val_path)
+
+            pre_train_accuray = test(valdb, args.val_path)
         model.train()
         if args.model == 'SiameseNet':
             loss = train_siamese(epoch, train_loader, model, optimizer, criterion)
         else:
             loss = train(epoch, train_loader, model, optimizer, criterion)
         log.info("epoch {0}: Loss = {1}".format(epoch, loss))
+        loss_per_iter.append(loss)
         # acc, cm = validate(epoch, val_loader, model, criterion)
+
 
     # ---- Test ---- #
     # Set to eval mode
     model.eval()
+
     testdb = create_database(args.data_size, 'Base', val_transforms, model, trainpath, args.img_w, args.img_h, saveto="testsave")
-    test(testdb, args.test_path)
+    post_train_accuracy = test(testdb, args.test_path)
+    log.info("Accuracy change: pre-training {} --> post-training {}".format(pre_train_accuray, post_train_accuracy))
+    log.info("---" * 60)
+
+    if loss_per_iter:
+        plt.plot(loss_per_iter)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.savefig('{}'.format(os.path.join(args.logdir, log_file_name)))
+        plt.show()
+
 
 
 def seed_worker(worker_id):
@@ -240,25 +314,38 @@ def create_database(size, dbtype, transforms, model, path, img_w, img_h, saveto=
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
 
-
-def test(db, test_path, full_test=True):
+def test(db, test_path, full_test=True, use_map=False, search_size=16):
     # Retrieval with a query image
     category_matches = 0
     total_queries = 0
+    maps = []
     with torch.no_grad():
         for f in os.listdir(test_path):
             qimgs = os.listdir(os.path.join(test_path, f)) if full_test else os.listdir(os.path.join(test_path, f))[:1]
-            for qimg in qimgs:
+            curr_folder_maps = []
+            for i, qimg in enumerate(qimgs):
                 total_queries += 1
                 im = Image.open(os.path.join(test_path, f, qimg))
-                I = db.search(im, 5)
-                log.debug("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
-                if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
+                I = db.search(im, search_size)
+                if use_map:
+                  curr_map = compute_map(I, db, f, search_size)
+                  curr_folder_maps.append(curr_map)
+                else:
+                  log.debug("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
+                  if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
                     log.debug("Found a match from {} class {}".format(qimg, f))
                     category_matches += 1
+            if use_map:
+              maps.append(sum(curr_folder_maps)/float(search_size))
     log.info("Args: {}".format(args))
-    log.info(
-        "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, category_matches / total_queries))
+    if use_map:
+        log.info("MEAN AVERAGE PRECISIONS BY CATEGORY: {}".format(maps))
+    else:
+        accuracy = round(category_matches / total_queries, 4)
+        log.info("Args: {}, seed: {}".format(args, seed_value))
+        log.info(
+            "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, accuracy))
+        return accuracy
 
 
 if __name__ == '__main__':

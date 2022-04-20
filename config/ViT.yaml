@@ -1,15 +1,16 @@
 Train:
-  batch_size: 1
-  learning_rate: 0.001
+  batch_size: 8
+  learning_rate: 0.01
   reg: 0.0005
-  epochs: 0
+  epochs: 10
   momentum: .9
   validevery: 100
-  train_path: 'dataset/flowers/train'
-  test_path: 'dataset/flowers/test'
-  val_path: 'dataset/flowers/test'
+  train_path: 'dataset/dogs/train'
+  test_path: 'dataset/dogs/test'
+  val_path: 'dataset/dogs/test'
   optimizer: 'feature_extractor'
   data_size: 1000
+  logdir: '.'
 
 
 network:
@@ -19,8 +20,8 @@ network:
 
 data:
   data: 'dataset/flowers'
-  img_h: 384
-  img_w: 384
+  img_h: 224
+  img_w: 224
   faiss_db: 'vitdb'
   save_db: True
   
@@ -32,4 +33,5 @@ dataset:
 
 Misc:
   # Supported log levels: critical, error, warning, info, debug
-  loglevel: 'debug'
+  logdir: 'logs'
+  loglevel: 'info'
