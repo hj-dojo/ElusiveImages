@@ -16,10 +16,10 @@ network:
   model: 'ViT'
 
 data:
-#  data: 'dataset/flowers'
-  img_h: 384
-  img_w: 384
-  faiss_db: 'vitdogdb'
+  data: 'dataset/flowers'
+  img_h: 224
+  img_w: 224
+  faiss_db: 'vitdb'
   save_db: True
   
 loss:
