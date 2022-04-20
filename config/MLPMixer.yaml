@@ -15,6 +15,8 @@ Train:
 
 network:
   model: 'MLPMixer'
+  category: 'Mixer-B_16-21k'
+  pretrain: True
 
 data:
   data: 'dataset/flowers'
