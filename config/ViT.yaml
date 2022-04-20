@@ -10,6 +10,7 @@ Train:
   val_path: 'dataset/dogs/test'
   optimizer: 'feature_extractor'
   data_size: 1000
+  logdir: '.'
 
 
 network:
