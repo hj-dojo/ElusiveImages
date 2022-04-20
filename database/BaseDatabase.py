@@ -39,12 +39,14 @@ class BaseDatabase:
     def search(self, input, k):
         with torch.no_grad():
           input = input.resize((self.w, self.h))
-          input = torch.tensor([self.transforms(input).numpy()]).to(self.device)
+          #input = torch.tensor([self.transforms(input).numpy()]).to(self.device)
+          input = torch.unsqueeze(self.transforms(input), 0).to(self.device)
           input = self.model(input).cpu().numpy()
           _, I = self.db.search(input, k)
         return I
 
     def save(self, filename):
+        print("Saving database to {}".format(filename))
         serialized = faiss.serialize_index(self.db)
         np.save(filename+".npy", serialized)
 
