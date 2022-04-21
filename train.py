@@ -165,7 +165,7 @@ def run_experiment(params, log_file_name):
         model.train()
         loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
         log.info("epoch {0}: Loss = {1}".format(epoch, loss))
-        loss_per_iter.append(loss)
+        loss_per_iter.append(loss.item())
         # acc, cm = validate(epoch, val_loader, model, criterion)
     # ---- Test ---- #
     # Set to eval mode
@@ -178,7 +178,6 @@ def run_experiment(params, log_file_name):
     log.info("---" * 60)
 
     if loss_per_iter:
-        loss_per_iter = loss_per_iter.cpu().detach().numpy()
         plt.plot(loss_per_iter)
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
