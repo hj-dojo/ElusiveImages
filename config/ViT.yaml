@@ -2,12 +2,12 @@ Train:
   batch_size: 8
   learning_rate: 0.01
   reg: 0.0005
-  epochs: 10
+  epochs: 1
   momentum: .9
   validevery: 100
-  train_path: 'dataset/dogs/train'
-  test_path: 'dataset/dogs/test'
-  val_path: 'dataset/dogs/test'
+  train_path: 'dataset/flowers/train'
+  test_path: 'dataset/flowers/test'
+  val_path: 'dataset/flowers/test'
   optimizer: 'feature_extractor'
   data_size: 1000
   logdir: '.'
@@ -15,7 +15,7 @@ Train:
 
 network:
   model: 'ViT'
-  category: 'B_16_imagenet1k'
+  category: 'vit_b_16'
   pretrain: True
 
 data:
