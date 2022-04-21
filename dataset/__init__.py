@@ -1,2 +1,3 @@
 from .TripletData import *
-from .SiameseData import *
+from .ContrastiveData import *
+from .QuadrupletData import *

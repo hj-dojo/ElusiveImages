@@ -27,7 +27,7 @@ loss:
   loss_type: 'ContrastiveLoss'
 
 dataset:
-  dataset: 'SiameseData'
+  dataset: 'ContrastiveData'
 
 Misc:
   # Supported log levels: critical, error, warning, info, debug

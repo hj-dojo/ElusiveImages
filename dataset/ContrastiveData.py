@@ -6,7 +6,8 @@ from PIL import Image
 import random
 import numpy as np
 
-class SiameseData(Dataset):
+
+class ContrastiveData(Dataset):
 
     def __init__(self, img_dir, transforms=None, should_invert=False):
         self.imageFolderDataset = datasets.ImageFolder(root=img_dir)
