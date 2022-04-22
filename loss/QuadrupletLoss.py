@@ -1,6 +1,4 @@
 import torch
-import torch.nn.functional as F
-
 
 class QuadrupletLoss(torch.nn.Module):
     """
