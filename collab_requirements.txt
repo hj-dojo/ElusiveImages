@@ -5,8 +5,7 @@ scipy
 future
 pip
 tqdm
-faiss
-faiss-cpu
+# replace with faiss-cpu for non cuda environments
 faiss-gpu
 pytorch-pretrained-vit
 ml-collections
