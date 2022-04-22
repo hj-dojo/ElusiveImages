@@ -11,12 +11,18 @@ Train:
   optimizer: 'feature_extractor'
   data_size: 1000
   logdir: '.'
+  use_map: False
+  full_test: True
+  search_size: 16
 
 
 network:
   model: 'ViT'
   category: 'vit_b_16'
   pretrain: True
+  identity_start: 1
+  identity_end: 12
+  identity_step: 1
 
 data:
   data: 'dataset/flowers'
