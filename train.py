@@ -138,7 +138,10 @@ def run_experiment(params, log_file_name):
     if params['loss_type'] == 'TripletLoss':
         criterion = TripletLoss()
     elif params['loss_type'] == 'ContrastiveLoss':
-        criterion = ContrastiveLoss()
+        if 'loss_margin' in params:
+            criterion = ContrastiveLoss(params['loss_margin'])
+        else:
+            criterion = ContrastiveLoss()
     elif params['loss_type'] == 'QuadrupletLoss':
         criterion = QuadrupletLoss()
     else:
@@ -196,7 +199,7 @@ def run_experiment(params, log_file_name):
     plot_learningcurve('Learning Curve: {0}({1}'.format(params['model'], params['loss_type']),
                        loss_per_iter, val_loss_per_iter, "Epoch",
                        "Loss", '{}'.format(os.path.join(params['logdir'], plot_filename)))
-    json_filename = '{}.png'.format(os.path.join(params['logdir'], log_file_name.replace('analysis', '')))
+    json_filename = '{}.png'.format(log_file_name.replace('analysis', ''))
     with open(os.path.join(params['logdir'], 'json', log_file_name), 'w'):
       json.dump({'train': loss_per_iter, 'test': val_loss_per_iter})
 
