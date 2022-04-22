@@ -34,7 +34,7 @@ parser.add_argument('--mode', default='train')
 
 # Seed value to reproduce results
 seed_value = 111111
-
+#seed_value = 123
 
 
 class Identity(nn.Module):
@@ -57,32 +57,7 @@ def main():
             setattr(args, k, v)
             all_params[k] = v
 
-    # log.basicConfig(level=args.loglevel.upper(), format='%(message)s')
-    log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}'.format(args.model.lower(),
-                                                                                       pathlib.Path(
-                                                                                           args.train_path).parts[1],
-                                                                                       args.loss_type.lower(),
-                                                                                       args.dataset.lower(),
-                                                                                       args.optimizer.lower(),
-                                                                                       args.epochs,
-                                                                                       str(args.learning_rate).replace(
-                                                                                           '.', '_'),
-                                                                                       str(args.momentum).replace('.',
-                                                                                                                  '_'),
-                                                                                       args.batch_size,
-                                                                                       args.img_w,
-                                                                                       args.img_h,
-                                                                                       seed_value)
-
-    log.basicConfig(
-        level=args.loglevel.upper(),
-        format="[%(levelname)s] %(message)s",
-        handlers=[
-            log.FileHandler("{}.txt".format(os.path.join(args.logdir, log_file_name))),
-            log.StreamHandler(sys.stdout)
-        ]
-    )
-
+    log_file_name = setup_logging(all_params, seed_value)
     print("Args: {}, seed: {}".format(args, seed_value))
 
     if args.mode.lower() != 'train':
@@ -114,7 +89,24 @@ def set_seed(seed_value):
     torch.use_deterministic_algorithms(True)
 
 
-def run_experiment(params, log_file_name):
+def setup_logging(params, seed_value):
+    log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}'.format(params['model'].lower(), \
+                                        pathlib.Path(params['train_path']).parts[1], params['loss_type'].lower(),
+                                        params['dataset'].lower(), params['optimizer'].lower(), params['epochs'],
+                                        str(params['learning_rate']).replace('.', '_'), str(params['momentum']).replace('.','_'),
+                                        params['batch_size'], params['img_w'], params['img_h'], seed_value)
+
+    log.basicConfig(
+        level=params['loglevel'].upper(),
+        format="[%(levelname)s] %(message)s",
+        handlers=[
+            log.FileHandler("{}.txt".format(os.path.join(params['logdir'], log_file_name))),
+            log.StreamHandler(sys.stdout)
+        ]
+    )
+    return log_file_name
+
+def run_experiment(params, log_file_name, full_test=True, use_map=False, search_size=16):
 
     # ----- Model ----- #
     if params['model'] == 'MLPMixer':
@@ -125,9 +117,9 @@ def run_experiment(params, log_file_name):
                                    params['img_h'], params['img_w'])
 
     # ----- Dataset ----- #
-    train_loader, train_transforms, _, val_transforms = create_dataset(params['dataset'], params['batch_size'],
+    train_loader, train_transforms, val_loader, val_transforms = create_dataset(params['dataset'], params['batch_size'],
                                                                        params['train_path'], params['val_path'],
-                                                                     params['img_w'], params['img_h'], create_validation=False)
+                                                                     params['img_w'], params['img_h'], create_validation=True)
 
     # ----- Loss ----- #
     if params['loss_type'] == 'TripletLoss':
@@ -143,9 +135,10 @@ def run_experiment(params, log_file_name):
     optimizer = create_optimizer(params['model'], model, params['optimizer'], params['learning_rate'], params['momentum'])
 
     # ----- Train ----- #
-    v = vars(args)
+    #v = vars(args)
     pre_train_accuracy = 'NA'
     loss_per_iter = []
+    val_loss_per_iter = []
     trainpath = params['train_path']
     num_epochs = params['epochs']
     for epoch in range(num_epochs):
@@ -162,28 +155,26 @@ def run_experiment(params, log_file_name):
                                         params['img_h'])
 
             pre_train_accuracy = test(valdb, params['val_path'])
-        model.train()
-        loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
-        log.info("epoch {0}: Loss = {1}".format(epoch, loss))
-        loss_per_iter.append(loss)
+        loss, avg_loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
+        val_loss, avg_val_loss = evaluate(epoch, val_loader, model, params['loss_type'], criterion)
+        log.info("epoch {0}: Loss = {1}, Validation Loss = {2}".format(epoch, loss, val_loss))
+        loss_per_iter.append(loss.item())
+        val_loss_per_iter.append(val_loss.item())
         # acc, cm = validate(epoch, val_loader, model, criterion)
+
     # ---- Test ---- #
     # Set to eval mode
     model.eval()
 
     testdb = create_database(params['data_size'], 'Base', val_transforms, model, trainpath, params['img_w'],
                                         params['img_h'], saveto="testsave")
-    post_train_accuracy = test(testdb, params['test_path'])
+    post_train_accuracy = test(testdb, params['test_path'], full_test=full_test, use_map=use_map, search_size=search_size)
     log.info("Accuracy change: pre-training {} --> post-training {}".format(pre_train_accuracy, post_train_accuracy))
     log.info("---" * 60)
 
-    if loss_per_iter:
-        loss_per_iter = loss_per_iter.cpu().detach().numpy()
-        plt.plot(loss_per_iter)
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.savefig('{}'.format(os.path.join(params['logdir'], log_file_name)))
-        plt.show()
+    plot_filename = '{}.png'.format(os.path.join(params['logdir'], log_file_name.replace('analysis', 'learningcurve')))
+    plot_learningcurve(plot_filename, loss_per_iter, val_loss_per_iter, "Epoch",
+                       "Loss", '{}'.format(os.path.join(params['logdir'], log_file_name)))
 
 
 def create_model(model_name, model_category, pretrain, img_height, img_width, **kwargs):
@@ -192,7 +183,7 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
         # model = resnet32()
         model = tvmodels.resnet18()
     elif model_name == 'ViT':
-        class_ = getattr(tvmodels, args.category)
+        class_ = getattr(tvmodels, model_category)
         model = class_(pretrained=True)
 
         ###  FOR OTHER EXPERIMENTS
@@ -214,7 +205,7 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
         else:
             backbone = 'resnet18'
         model = SiameseNet(backbone, pretrain)
-    elif args.model == 'MLPMixer':
+    elif model_name == 'MLPMixer':
         # TO USE DOWNLOAD PRETRAINED MODEL: wget https://storage.googleapis.com/mixer_models/imagenet21k/Mixer-B_16.npz
         c = CONFIGS[model_category]
         if kwargs is not None:
@@ -224,9 +215,9 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
             model = MlpMixer(c, img_height, num_classes=num_classes, patch_size=patch_size, zero_head=zero_head)
         else:
             model = MlpMixer(c, img_height, num_classes=17, patch_size=16, zero_head=True)
-        model.load_from(np.load(args.pretrained_path))
+        model.load_from(np.load(params['pretrained_path']))
     else:
-        raise NotImplementedError(args.model + " model not implemented!")
+        raise NotImplementedError(model_name + " model not implemented!")
 
     if torch.cuda.is_available():
         model = model.cuda()
@@ -267,7 +258,7 @@ def create_dataset(dataset_type, batch_size, train_path, validation_path, img_wi
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])])
         val_dataset = ContrastiveData(validation_path, val_transforms)
-        train_dataset = ContrastiveData(args.train_path, train_transforms)
+        train_dataset = ContrastiveData(train_path, train_transforms)
     else:
         raise NotImplementedError(dataset_type + " dataset not implemented!")
 
@@ -311,31 +302,61 @@ def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum)
     return optimizer
 
 
-def train(epoch, loader, model, opt, loss_type, crit):
+def train(epoch, loader, model, opt, loss_type, criterion):
+    model.train()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    log.info("Epoch {}".format(epoch))
+    log.info("Training Epoch {}".format(epoch))
     loss = 0
     for data in tqdm(loader):
         opt.zero_grad()
         if loss_type == 'TripletLoss':
             x1, x2, x3 = data
             e1, e2, e3 = model(x1.to(device)), model(x2.to(device)), model(x3.to(device))
-            l = crit(e1, e2, e3)
+            l = criterion(e1, e2, e3)
         elif loss_type == 'ContrastiveLoss':
             x1, x2, label = data
             e1, e2, label = model(x1.to(device)), model(x2.to(device)), label.to(device)
-            l = crit(e1, e2, label)
+            l = criterion(e1, e2, label)
         elif loss_type == 'QuadrupletLoss':
             x1, x2, x3, x4 = data
             e1, e2, e3, e4 = model(x1.to(device)), model(x2.to(device)), model(x3.to(device)), model(x4.to(device))
-            l = crit(e1, e2, e3, e4)
+            l = criterion(e1, e2, e3, e4)
 
         l.backward()
         opt.step()
         loss += l
         # batch_map = compute_map(out, target)
         # log.info("BATCH MAP IS: {batch_map}").format(batch_map)
-    return loss
+    avg_loss = loss/len(loader)
+    return loss, avg_loss
+
+
+def evaluate(epoch, loader, model, loss_type, criterion):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    log.info("Validating Epoch {}".format(epoch))
+    # Set the model to eval mode to avoid weights update
+    model.eval()
+    total_loss = 0.
+    with torch.no_grad():
+        for data in tqdm(loader):
+            if loss_type == 'TripletLoss':
+                x1, x2, x3 = data
+                e1, e2, e3 = model(x1.to(device)), model(x2.to(device)), model(x3.to(device))
+                l = criterion(e1, e2, e3)
+            elif loss_type == 'ContrastiveLoss':
+                x1, x2, label = data
+                e1, e2, label = model(x1.to(device)), model(x2.to(device)), label.to(device)
+                l = criterion(e1, e2, label)
+            elif loss_type == 'QuadrupletLoss':
+                x1, x2, x3, x4 = data
+                e1, e2, e3, e4 = model(x1.to(device)), model(x2.to(device)), model(x3.to(device)), model(x4.to(device))
+                l = criterion(e1, e2, e3, e4)
+
+            total_loss += l
+
+    avg_loss = total_loss / len(loader)
+    return total_loss, avg_loss
+
 
 
 def create_database(size, dbtype, transforms, model, path, img_w, img_h, saveto=None, npy=None):
@@ -368,16 +389,35 @@ def test(db, test_path, full_test=True, use_map=False, search_size=16):
                     category_matches += 1
             if use_map:
               maps.append(sum(curr_folder_maps)/float(search_size))
-    log.info("Args: {}".format(args))
     if use_map:
         log.info("MEAN AVERAGE PRECISIONS BY CATEGORY: {}".format(maps))
     else:
         accuracy = round(category_matches / total_queries, 4)
-        log.info("Args: {}, seed: {}".format(args, seed_value))
         log.info(
             "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, accuracy))
         return accuracy
 
+def plot_learningcurve(title, train_history, validation_history, x_label, y_label, log_filename):
+    # Plot the training values and validation values as two separate curves
+    plt.figure()
+    plt.title(title)
+    x_values = range(len(train_history))
+
+    plt.xlabel(x_label)
+    plt.xticks(x_values)
+    plt.ylabel(y_label)
+    max_y = max(max(train_history), max(validation_history))
+    step = np.round(max_y/10, 1) if max_y > 0.5 else (np.round(max_y/10, 2) if max_y > 0.25 else np.round(max_y/10, 3))
+    max_y += step*2
+    print(max_y, step)
+    plt.yticks(np.arange(0, max_y, step=step))
+
+    plt.plot(x_values, train_history, 'o-', color="r", label="train")
+    plt.plot(x_values, validation_history, 'o-', color="g", label="valid")
+
+    plt.legend(loc="best")
+    plt.savefig("{0}.png".format(title.replace(' ', '_')))
+    plt.show()
 
 if __name__ == '__main__':
     main()

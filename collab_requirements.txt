@@ -1,0 +1,12 @@
+numpy
+pyyaml
+matplotlib
+scipy
+future
+pip
+tqdm
+faiss
+faiss-cpu
+faiss-gpu
+pytorch-pretrained-vit
+ml-collections
