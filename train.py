@@ -36,11 +36,13 @@ parser.add_argument('--mode', default='train')
 seed_value = 111111
 #seed_value = 123
 
+# To fix the error: OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized.
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
-        
+
     def forward(self, x):
         return x
 
@@ -106,7 +108,11 @@ def setup_logging(params, seed_value):
     )
     return log_file_name
 
-def run_experiment(params, log_file_name, full_test=True, use_map=False, search_size=16):
+
+def run_experiment(params, log_file_name):
+    full_test = params.get('full_test', True)
+    use_map = params.get('use_map', False)
+    search_size = params.get('search_size', 16)
 
     # ----- Model ----- #
     if params['model'] == 'MLPMixer':
@@ -114,7 +120,9 @@ def run_experiment(params, log_file_name, full_test=True, use_map=False, search_
                                    params['img_h'], params['img_w'], num_classes=17, patch_size=16, zero_head=True)
     else:
         model = create_model(params['model'], params['category'], params['pretrain'],
-                                   params['img_h'], params['img_w'])
+                                   params['img_h'], params['img_w'], **{'identity_start': params['identity_start'],
+                                                                      'identity_end': params['identity_end'],
+                                                                      'identity_step': params['identity_step']})
 
     # ----- Dataset ----- #
     train_loader, train_transforms, val_loader, val_transforms = create_dataset(params['dataset'], params['batch_size'],
@@ -197,7 +205,16 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
         model = tvmodels.resnet18()
     elif model_name == 'ViT':
         class_ = getattr(tvmodels, model_category)
-        model = class_(pretrained=True)
+        model = class_(pretrained=pretrain)
+
+        s, e, step = int(kwargs['identity_start']), int(kwargs['identity_end']), int(kwargs['identity_step'])
+        for i in range(s, e, step):
+            layer = 'encoder_layer_{}'.format(i)
+            if hasattr(model.encoder.layers, layer):
+                log.info("Setting layer {} to Identity for model {}".format(layer, model_name))
+                setattr(model.encoder.layers, layer, Identity())
+            else:
+                log.error("Invalid layer {} for model {}".format(layer, model_name))
 
         ###  FOR OTHER EXPERIMENTS
         # model.encoder.layers.encoder_layer_11 = Identity()
@@ -319,6 +336,23 @@ def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum)
             param.requires_grad = False
         if model_type == 'ViT':
           model.heads[0] = nn.Linear(model.heads[0].in_features, 1000, device=device)
+
+          #### Furhter experimentation with deeper layers.
+          # if args.optimizer.lower() == 'feature_extractor_e11_mlp_l2':
+          #     model.encoder.layers.encoder_layer_11.mlp.linear_2 = nn.Linear(
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_2.in_features,
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_2.out_features, device='cuda')
+          # elif args.optimizer.lower() == 'feature_extractor_e11_mlp_l1':
+          #     model.encoder.layers.encoder_layer_11.mlp.linear_1 = nn.Linear(
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_1.in_features,
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_1.out_features, device='cuda')
+          # elif args.optimizer.lower() == 'feature_extractor_e11_mlp_l1_l2':
+          #     model.encoder.layers.encoder_layer_11.mlp.linear_1 = nn.Linear(
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_1.in_features,
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_1.out_features, device='cuda')
+          #     model.encoder.layers.encoder_layer_11.mlp.linear_2 = nn.Linear(
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_2.in_features,
+          #         model.encoder.layers.encoder_layer_11.mlp.linear_2.out_features, device='cuda')
         else:
           model.fc = nn.Linear(model.fc.in_features, 1000, device=device)
         params_to_update = []
@@ -440,7 +474,7 @@ def plot_learningcurve(title, train_history, validation_history, x_label, y_labe
     max_y = max(max(train_history), max(validation_history))
     step = np.round(max_y/10, 1) if max_y > 0.5 else (np.round(max_y/10, 2) if max_y > 0.25 else np.round(max_y/10, 3))
     max_y += step*2
-    print(max_y, step)
+    # print(max_y, step)
     plt.yticks(np.arange(0, max_y, step=step))
 
     plt.plot(x_values, train_history, 'o-', color="r", label="train")
