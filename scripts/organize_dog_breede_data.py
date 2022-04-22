@@ -6,6 +6,7 @@ import os
 import pathlib
 import random
 import shutil
+import json
 
 import pandas as pd
 from collections import OrderedDict
@@ -22,7 +23,8 @@ train_data_path = os.path.join(path_to_organized_dataset, "train")
 test_data_path = os.path.join(path_to_organized_dataset, "test")
 
 # specify number of breeds to use. Total number of breeds 120
-num_breeds = 30
+num_breeds = 120
+num_breeds_to_use = 30
 
 # read the csv file
 df_labels = pd.read_csv(labels_csv)
@@ -46,11 +48,24 @@ breed_img_data = df_labels.groupby('breed')['img_file'].apply(list).to_dict()
 # Note: least number of images for a dog breede is 66. To make dataset balanced picking  66 images for each breed.
 img_limit = len(breed_img_data[min(breed_img_data, key=lambda k: len(breed_img_data[k]))])
 
-img_limit = 30
+# img_limit = 30
+
+with open('dogs_12066_accuracy.txt') as rfp:
+    dogs_cat_accr = dict(json.load(rfp))
+
+
+dog_breeds_to_use = set()
+for breed in sorted(dogs_cat_accr.items(), key=lambda x: x[1])[:num_breeds_to_use]:
+    dog_breeds_to_use.add(breed[0])
+
 
 train_split_ratio = 0.8
 breed_to_num = {}
-for breed_num, (breed, img_list) in enumerate(breed_img_data.items(), 1):
+
+breed_num = 0
+for num, (breed, img_list) in enumerate(breed_img_data.items(), 1):
+    if str(num) not in dog_breeds_to_use: continue
+    breed_num += 1
     img_list = img_list[:img_limit]
     # Note: exist_ok -- deletes the directory if it already exists.
     train_dir, test_dir = os.path.join(train_data_path, str(breed_num)), os.path.join(test_data_path, str(breed_num))
