@@ -98,6 +98,7 @@ def setup_logging(params, seed_value):
                                         str(params['learning_rate']).replace('.', '_'), str(params['momentum']).replace('.','_'),
                                         params['batch_size'], params['img_w'], params['img_h'], seed_value)
 
+    os.makedirs(params['logdir'], exist_ok=True)
     log.basicConfig(
         level=params['loglevel'].upper(),
         format="[%(levelname)s] %(message)s",
@@ -199,9 +200,10 @@ def run_experiment(params, log_file_name):
     plot_learningcurve('Learning Curve: {0}({1})'.format(params['model'], params['loss_type']),
                        loss_per_iter, val_loss_per_iter, "Epoch",
                        "Loss", '{}'.format(os.path.join(params['logdir'], plot_filename)))
-    json_filename = '{}.png'.format(log_file_name.replace('analysis', ''))
-    with open(os.path.join(params['logdir'], 'json', log_file_name), 'w'):
-      json.dump({'train': loss_per_iter, 'test': val_loss_per_iter})
+    json_filename = os.path.join(params['logdir'], 'json', log_file_name)
+    os.makedirs(os.path.dirname(json_filename), exist_ok=True)
+    with open(json_filename, 'w') as fp:
+        json.dump({'train': loss_per_iter, 'test': val_loss_per_iter}, fp)
 
     # Keeping it if we want to just plot training loss
     if loss_per_iter:
