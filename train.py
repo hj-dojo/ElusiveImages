@@ -112,6 +112,7 @@ def setup_logging(params, seed_value):
 def run_experiment(params, log_file_name):
     full_test = params.get('full_test', True)
     use_map = params.get('use_map', False)
+    use_accuracy = params.get('use_accuracy', False)
     search_size = params.get('search_size', 16)
 
     # ----- Model ----- #
@@ -148,7 +149,6 @@ def run_experiment(params, log_file_name):
 
     # ----- Train ----- #
     #v = vars(args)
-    pre_train_accuracy = 'NA'
     loss_per_iter = []
     val_loss_per_iter = []
     trainpath = params['train_path']
@@ -166,7 +166,7 @@ def run_experiment(params, log_file_name):
                 valdb = create_database(params['data_size'], 'Base', val_transforms, model, trainpath, params['img_w'],
                                         params['img_h'])
 
-            pre_train_accuracy = test(valdb, params['val_path'])
+            pre_train_results = test(valdb, params['val_path'], full_test=full_test, use_map=use_map, search_size=search_size, use_accuracy=use_accuracy)
 
         model.train()
         loss, avg_loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
@@ -183,8 +183,13 @@ def run_experiment(params, log_file_name):
 
     testdb = create_database(params['data_size'], 'Base', val_transforms, model, trainpath, params['img_w'],
                                         params['img_h'], saveto="testsave")
-    post_train_accuracy = test(testdb, params['test_path'], full_test=full_test, use_map=use_map, search_size=search_size)
-    log.info("Accuracy change: pre-training {} --> post-training {}".format(pre_train_accuracy, post_train_accuracy))
+    post_train_results = test(testdb, params['test_path'], full_test=full_test, use_map=use_map, search_size=search_size, use_accuracy=use_accuracy)
+    if use_accuracy:
+        log.info("Accuracy change: pre-training {} --> post-training {}".format(pre_train_results.get('accuracy', 'NA'), post_train_results.get('accuracy', 'NA')))
+    if use_map:
+        log.info("MAP change: pre-training {} --> post-training {}".format(pre_train_results.get('map', 'NA'),
+                                                                                post_train_results.get('map',
+                                                                                                       'NA')))
     log.info("---" * 60)
 
     plot_filename = '{}.png'.format(os.path.join(params['logdir'], log_file_name.replace('analysis', 'learningcurve')))
@@ -197,6 +202,7 @@ def run_experiment(params, log_file_name):
         plt.plot(loss_per_iter)
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
+        plt.tight_layout()
         plt.savefig('{}'.format(os.path.join(params['logdir'], log_file_name)))
         plt.show()
 
@@ -338,6 +344,7 @@ def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum)
                 optimizer_type))
         for param in model.parameters():
             param.requires_grad = False
+
         if model_type == 'ViT':
           model.heads[0] = nn.Linear(model.heads[0].in_features, 1000, device=device)
 
@@ -433,15 +440,17 @@ def create_database(size, dbtype, transforms, model, path, img_w, img_h, saveto=
         raise NotImplementedError(dbtype + " database not implemented!")
 
 
-def test(db, test_path, full_test=True, use_map=False, search_size=16):
+def test(db, test_path, full_test=True, use_map=False, search_size=16, use_accuracy=True):
     # Retrieval with a query image
     category_matches = 0
     total_queries = 0
     maps = []
+    cat_accuracy_dict = {}
     with torch.no_grad():
         for f in os.listdir(test_path):
             qimgs = os.listdir(os.path.join(test_path, f)) if full_test else os.listdir(os.path.join(test_path, f))[:1]
             curr_folder_maps = []
+            cat_accuracy_dict[f] = 0
             for i, qimg in enumerate(qimgs):
                 total_queries += 1
                 im = Image.open(os.path.join(test_path, f, qimg))
@@ -449,21 +458,25 @@ def test(db, test_path, full_test=True, use_map=False, search_size=16):
                 if use_map:
                   curr_map = compute_map(I, db, f, search_size)
                   curr_folder_maps.append(curr_map)
-                else:
+                if use_accuracy:
                   log.debug("CLASS {}.... QIMG {} Retrieved Image: {}".format(f, qimg, db.im_indices[I[0][0]]))
                   if str(pathlib.Path(db.im_indices[I[0][0]]).parts[3]) == f:
                     log.debug("Found a match from {} class {}".format(qimg, f))
                     category_matches += 1
+                    cat_accuracy_dict[f] += 1
+            cat_accuracy_dict[f] /= len(qimgs)
             if use_map:
               maps.append(sum(curr_folder_maps)/float(search_size))
+    results = {}
     if use_map:
         log.info("MEAN AVERAGE PRECISIONS BY CATEGORY: {}".format(maps))
-        return maps
-    else:
+        results['maps'] = maps
+    if use_accuracy:
         accuracy = round(category_matches / total_queries, 4)
         log.info(
             "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, accuracy))
-        return accuracy
+        results['accuracy'] = accuracy
+    return results
 
 
 def plot_learningcurve(title, train_history, validation_history, x_label, y_label, plot_filename):
