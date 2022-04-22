@@ -17,7 +17,7 @@ class TripletData(Dataset):
         self.__get_classes()
 
     def __len__(self):
-        return 20*self.cats
+        return len(self.imageFolderDataset)
 
     def __get_classes(self):
         # create hashmap of classes to image tuples
