@@ -2,7 +2,6 @@ import torch.nn as nn
 import torchvision.models as tvmodels
 
 
-
 class SiameseNet(nn.Module):
     def __init__(self, category, pretrained=True):
         super(SiameseNet, self).__init__()
