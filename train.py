@@ -129,7 +129,7 @@ def run_experiment(params, log_file_name, full_test=True, use_map=False, search_
     elif params['loss_type'] == 'QuadrupletLoss':
         criterion = QuadrupletLoss()
     else:
-        raise NotImplementedError( params['loss_type'] + " loss not implemented!")
+        raise NotImplementedError(params['loss_type'] + " loss not implemented!")
 
     # ----- Optimizer ----- #
     optimizer = create_optimizer(params['model'], model, params['optimizer'], params['learning_rate'], params['momentum'])
@@ -176,8 +176,9 @@ def run_experiment(params, log_file_name, full_test=True, use_map=False, search_
     log.info("---" * 60)
 
     plot_filename = '{}.png'.format(os.path.join(params['logdir'], log_file_name.replace('analysis', 'learningcurve')))
-    plot_learningcurve(plot_filename, loss_per_iter, val_loss_per_iter, "Epoch",
-                       "Loss", '{}'.format(os.path.join(params['logdir'], log_file_name)))
+    plot_learningcurve('Learning Curve: {0}({1}'.format(params['model'], params['loss_type']),
+                       loss_per_iter, val_loss_per_iter, "Epoch",
+                       "Loss", '{}'.format(os.path.join(params['logdir'], plot_filename)))
 
     # Keeping it if we want to just plot training loss
     if loss_per_iter:
@@ -271,6 +272,22 @@ def create_dataset(dataset_type, batch_size, train_path, validation_path, img_wi
                                  std=[0.229, 0.224, 0.225])])
         val_dataset = ContrastiveData(validation_path, val_transforms)
         train_dataset = ContrastiveData(train_path, train_transforms)
+    elif dataset_type == 'QuadrupletData':
+        train_transforms = transforms.Compose([transforms.Resize((img_width, img_height)),
+                                               transforms.RandomResizedCrop(100),
+                                               transforms.RandomHorizontalFlip(),
+                                               transforms.RandomRotation(10),
+                                               transforms.ToTensor(),
+                                               transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                                    std=[0.229, 0.224, 0.225])])
+
+        val_transforms = transforms.Compose([
+            transforms.Resize((img_width, img_height)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])])
+        val_dataset = QuadrupletData(validation_path, val_transforms)
+        train_dataset = QuadrupletData(train_path, train_transforms)
     else:
         raise NotImplementedError(dataset_type + " dataset not implemented!")
 
@@ -411,7 +428,7 @@ def test(db, test_path, full_test=True, use_map=False, search_size=16):
         return accuracy
 
 
-def plot_learningcurve(title, train_history, validation_history, x_label, y_label, log_filename):
+def plot_learningcurve(title, train_history, validation_history, x_label, y_label, plot_filename):
     # Plot the training values and validation values as two separate curves
     plt.figure()
     plt.title(title)
@@ -430,7 +447,7 @@ def plot_learningcurve(title, train_history, validation_history, x_label, y_labe
     plt.plot(x_values, validation_history, 'o-', color="g", label="valid")
 
     plt.legend(loc="best")
-    plt.savefig("{0}.png".format(title.replace(' ', '_')))
+    plt.savefig(plot_filename)
     plt.show()
 
 if __name__ == '__main__':
