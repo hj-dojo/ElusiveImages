@@ -1,17 +1,18 @@
 Train:
   batch_size: 8
-  learning_rate: 0.01
+  learning_rate: 0.0001
   reg: 0.0005
-  epochs: 1
+  epochs: 20
   momentum: .9
-  validevery: 100
+  validevery: 10
   train_path: 'dataset/flowers/train'
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
   optimizer: 'feature_extractor'
   data_size: 1000
   logdir: '.'
-  use_map: False
+  use_map: True
+  use_accuracy: True
   full_test: True
   search_size: 16
 
@@ -20,8 +21,9 @@ network:
   model: 'ViT'
   category: 'vit_b_16'
   pretrain: True
-  identity_start: 1
-  identity_end: 12
+  # Total 12 encoder layers from 1 to 11
+  identity_start: 0
+  identity_end: 0
   identity_step: 1
 
 data:
