@@ -25,9 +25,11 @@ data:
   
 loss:
   loss_type: 'ContrastiveLoss'
+  # used for contrastive loss only
+  loss_margin: 1.0
 
 dataset:
-  dataset: 'ContrastiveData'
+  dataset: 'TripletData'
 
 Misc:
   # Supported log levels: critical, error, warning, info, debug
