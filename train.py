@@ -196,7 +196,7 @@ def run_experiment(params, log_file_name):
     log.info("---" * 60)
 
     plot_filename = '{}.png'.format(log_file_name.replace('analysis', 'learningcurve'))
-    plot_learningcurve('Learning Curve: {0}({1}'.format(params['model'], params['loss_type']),
+    plot_learningcurve('Learning Curve: {0}({1})'.format(params['model'], params['loss_type']),
                        loss_per_iter, val_loss_per_iter, "Epoch",
                        "Loss", '{}'.format(os.path.join(params['logdir'], plot_filename)))
     json_filename = '{}.png'.format(log_file_name.replace('analysis', ''))
