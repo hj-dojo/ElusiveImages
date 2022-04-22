@@ -370,6 +370,7 @@ def test(db, test_path, full_test=True, use_map=False, search_size=16):
     log.info("Args: {}".format(args))
     if use_map:
         log.info("MEAN AVERAGE PRECISIONS BY CATEGORY: {}".format(maps))
+        return maps
     else:
         accuracy = round(category_matches / total_queries, 4)
         log.info("Args: {}, seed: {}".format(args, seed_value))
