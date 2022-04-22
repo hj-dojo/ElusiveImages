@@ -119,10 +119,14 @@ def run_experiment(params, log_file_name):
         model = create_model(params['model'], params['category'], params['pretrain'],
                                    params['img_h'], params['img_w'], num_classes=17, patch_size=16, zero_head=True)
     else:
+        kwargs = {}
+        if 'identity_start' in params:
+          kwargs = {'identity_start': params['identity_start'],
+                    'identity_end': params['identity_end'],
+                    'identity_step': params['identity_step']}
+
         model = create_model(params['model'], params['category'], params['pretrain'],
-                                   params['img_h'], params['img_w'], **{'identity_start': params['identity_start'],
-                                                                      'identity_end': params['identity_end'],
-                                                                      'identity_step': params['identity_step']})
+                                   params['img_h'], params['img_w'], **kwargs)
 
     # ----- Dataset ----- #
     train_loader, train_transforms, val_loader, val_transforms = create_dataset(params['dataset'], params['batch_size'],
