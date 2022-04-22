@@ -217,7 +217,7 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
         class_ = getattr(tvmodels, model_category)
         model = class_(pretrained=pretrain)
 
-        s, e, step = int(kwargs['identity_start']), int(kwargs['identity_end']), int(kwargs['identity_step'])
+        s, e, step = int(kwargs.get('identity_start', 0)), int(kwargs.get('identity_end', 0)), int(kwargs.get('identity_step', 1))
         for i in range(s, e, step):
             layer = 'encoder_layer_{}'.format(i)
             if hasattr(model.encoder.layers, layer):
