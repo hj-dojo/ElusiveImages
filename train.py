@@ -155,11 +155,14 @@ def run_experiment(params, log_file_name, full_test=True, use_map=False, search_
                                         params['img_h'])
 
             pre_train_accuracy = test(valdb, params['val_path'])
+
+        model.train()
         loss, avg_loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
         val_loss, avg_val_loss = evaluate(epoch, val_loader, model, params['loss_type'], criterion)
         log.info("epoch {0}: Loss = {1}, Validation Loss = {2}".format(epoch, loss, val_loss))
         loss_per_iter.append(loss.item())
         val_loss_per_iter.append(val_loss.item())
+
         # acc, cm = validate(epoch, val_loader, model, criterion)
 
     # ---- Test ---- #
@@ -175,6 +178,15 @@ def run_experiment(params, log_file_name, full_test=True, use_map=False, search_
     plot_filename = '{}.png'.format(os.path.join(params['logdir'], log_file_name.replace('analysis', 'learningcurve')))
     plot_learningcurve(plot_filename, loss_per_iter, val_loss_per_iter, "Epoch",
                        "Loss", '{}'.format(os.path.join(params['logdir'], log_file_name)))
+
+    # Keeping it if we want to just plot training loss
+    if loss_per_iter:
+        plt.plot(loss_per_iter)
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.savefig('{}'.format(os.path.join(params['logdir'], log_file_name)))
+        plt.show()
+
 
 
 def create_model(model_name, model_category, pretrain, img_height, img_width, **kwargs):
@@ -358,13 +370,13 @@ def evaluate(epoch, loader, model, loss_type, criterion):
     return total_loss, avg_loss
 
 
-
 def create_database(size, dbtype, transforms, model, path, img_w, img_h, saveto=None, npy=None):
     if dbtype == "Base":
         db = BaseDatabase(model, path, transforms, imgdims=(img_w, img_h), size=size, saveto=saveto, db=npy)
         return db
     else:
         raise NotImplementedError(dbtype + " database not implemented!")
+
 
 def test(db, test_path, full_test=True, use_map=False, search_size=16):
     # Retrieval with a query image
@@ -391,11 +403,13 @@ def test(db, test_path, full_test=True, use_map=False, search_size=16):
               maps.append(sum(curr_folder_maps)/float(search_size))
     if use_map:
         log.info("MEAN AVERAGE PRECISIONS BY CATEGORY: {}".format(maps))
+        return maps
     else:
         accuracy = round(category_matches / total_queries, 4)
         log.info(
             "CATEGORY MATCHES: {}/{}: {:.4f}".format(category_matches, total_queries, accuracy))
         return accuracy
+
 
 def plot_learningcurve(title, train_history, validation_history, x_label, y_label, log_filename):
     # Plot the training values and validation values as two separate curves
