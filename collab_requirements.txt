@@ -5,6 +5,7 @@ scipy
 future
 pip
 tqdm
+torchvision==0.12
 # replace with faiss-cpu for non cuda environments
 faiss-gpu
 pytorch-pretrained-vit
