@@ -59,5 +59,5 @@ class ContrastiveData(Dataset):
             img0 = self.transform(img0)
             img1 = self.transform(img1)
 
-        # include label for contrastive loss, label = 1 if similar or 0 otherwise
-        return img0, img1, torch.from_numpy(np.array([int(img1_tuple[1] == img0_tuple[1])], dtype=np.float32))
+        # include label for contrastive loss, label = 0 if similar or 1 otherwise
+        return img0, img1, torch.from_numpy(np.array([int(img1_tuple[1] != img0_tuple[1])], dtype=np.float32))
