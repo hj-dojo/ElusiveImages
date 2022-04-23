@@ -1,5 +1,5 @@
 Train:
-  batch_size: 256
+  batch_size: 32
   learning_rate: 0.0001
   reg: 0.05
   epochs: 25
@@ -9,17 +9,17 @@ Train:
   test_path: 'dataset/flowers/test'
   val_path: 'dataset/flowers/test'
   optimizer: 'adam'
-  data_size: 1000
+  data_size: 512
 
 network:
   model: 'SiameseNet'
-  category: 'resnet18'
-  pretrain: False
+  category: 'vit_b_16'
+  pretrain: True
 
 data:
   data: 'dataset/flowers'
-  img_h: 384
-  img_w: 384
+  img_h: 224
+  img_w: 224
   faiss_db: 'siamesedb'
   save_db: True
   
@@ -29,7 +29,7 @@ loss:
   loss_margin: 1.0
 
 dataset:
-  dataset: 'TripletData'
+  dataset: 'ContrastiveData'
 
 Misc:
   # Supported log levels: critical, error, warning, info, debug
