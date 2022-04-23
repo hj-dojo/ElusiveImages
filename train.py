@@ -149,7 +149,8 @@ def run_experiment(params, log_file_name):
         raise NotImplementedError(params['loss_type'] + " loss not implemented!")
 
     # ----- Optimizer ----- #
-    optimizer = create_optimizer(params['model'], model, params['optimizer'], params['learning_rate'], params['momentum'])
+    optimizer = create_optimizer(params['model'], model, params['optimizer'], params['learning_rate'],
+                                 params['momentum'], params.get('pretrain', False))
 
     # ----- Train ----- #
     #v = vars(args)
@@ -283,7 +284,6 @@ def create_dataset(dataset_type, batch_size, train_path, validation_path, img_wi
         val_dataset = TripletData(validation_path, val_transforms, path=validation_path)
     elif dataset_type == 'ContrastiveData':
         train_transforms = transforms.Compose([transforms.Resize((img_width, img_height)),
-                                               transforms.RandomResizedCrop(100),
                                                transforms.RandomHorizontalFlip(),
                                                transforms.RandomRotation(10),
                                                transforms.ToTensor(),
@@ -299,7 +299,6 @@ def create_dataset(dataset_type, batch_size, train_path, validation_path, img_wi
         train_dataset = ContrastiveData(train_path, train_transforms)
     elif dataset_type == 'QuadrupletData':
         train_transforms = transforms.Compose([transforms.Resize((img_width, img_height)),
-                                               transforms.RandomResizedCrop(100),
                                                transforms.RandomHorizontalFlip(),
                                                transforms.RandomRotation(10),
                                                transforms.ToTensor(),
@@ -328,14 +327,22 @@ def create_dataset(dataset_type, batch_size, train_path, validation_path, img_wi
     return train_loader, train_transforms, val_loader, val_transforms
 
 
-def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum):
+def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum, pretrain):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # ----- Optimizer ----- #
     if optimizer_type.lower() == 'sdg':
-        optimizer = torch.optim.SGD(model.parameters(), learning_rate, momentum=momentum)
+        if pretrain:
+            optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, model.parameters()),
+                                        learning_rate, momentum=momentum)
+        else:
+            optimizer = torch.optim.SGD(model.parameters(), learning_rate, momentum=momentum)
     elif optimizer_type.lower() == 'adam':
-        optimizer = torch.optim.Adam(model.parameters(), learning_rate)
+        if pretrain:
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()),
+                                         learning_rate)
+        else:
+            optimizer = torch.optim.Adam(model.parameters(), learning_rate)
     elif optimizer_type.lower() == 'feature_extractor':
         log.info(
             "With optimizer mode set to {}, final FC layer is being randomly initialized again for training".format(
