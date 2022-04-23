@@ -113,7 +113,7 @@ def setup_logging(params, seed_value):
 def run_experiment(params, log_file_name):
     full_test = params.get('full_test', True)
     use_map = params.get('use_map', False)
-    use_accuracy = params.get('use_accuracy', False)
+    use_accuracy = params.get('use_accuracy', True)
     search_size = params.get('search_size', 16)
 
     # ----- Model ----- #
