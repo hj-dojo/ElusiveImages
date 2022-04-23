@@ -205,16 +205,6 @@ def run_experiment(params, log_file_name):
     with open(json_filename, 'w') as fp:
         json.dump({'train': loss_per_iter, 'test': val_loss_per_iter}, fp)
 
-    # Keeping it if we want to just plot training loss
-    if loss_per_iter:
-        plt.plot(loss_per_iter)
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.tight_layout()
-        plt.savefig('{}'.format(os.path.join(params['logdir'], log_file_name)))
-        plt.show()
-
-
 
 def create_model(model_name, model_category, pretrain, img_height, img_width, **kwargs):
     # ----- Model ----- #
@@ -496,14 +486,20 @@ def plot_learningcurve(title, train_history, validation_history, x_label, y_labe
     plt.xlabel(x_label)
     plt.xticks(x_values)
     plt.ylabel(y_label)
-    max_y = max(max(train_history), max(validation_history))
+
+    if len(validation_history) > 0:
+        max_y = max(max(train_history), max(validation_history))
+    else:
+        max_y = max(train_history)
     step = np.round(max_y/10, 1) if max_y > 0.5 else (np.round(max_y/10, 2) if max_y > 0.25 else np.round(max_y/10, 3))
     max_y += step*2
     # print(max_y, step)
     plt.yticks(np.arange(0, max_y, step=step))
 
     plt.plot(x_values, train_history, 'o-', color="r", label="train")
-    plt.plot(x_values, validation_history, 'o-', color="g", label="valid")
+
+    if len(validation_history) > 0:
+        plt.plot(x_values, validation_history, 'o-', color="g", label="valid")
 
     plt.legend(loc="best")
     plt.savefig(plot_filename)
