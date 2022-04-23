@@ -12,11 +12,14 @@ class QuadrupletLoss(torch.nn.Module):
         self.margin1 = margin1
         self.margin2 = margin2
 
+    def calc_euclidean(self, x1, x2):
+        return (x1-x2).pow(2).sum(1)
+
     def forward(self, anchor, positive, negative1, negative2):
 
-        squarred_distance_pos = (anchor - positive).pow(2).sum(1)
-        squarred_distance_neg = (anchor - negative1).pow(2).sum(1)
-        squarred_distance_neg_b = (negative1 - negative2).pow(2).sum(1)
+        squarred_distance_pos = self.calc_euclidean(anchor, positive)
+        squarred_distance_neg = self.calc_euclidean(anchor, negative1)
+        squarred_distance_neg_b = self.calc_euclidean(negative1, negative2)
 
         quadruplet_loss = \
             F.relu(self.margin1 + squarred_distance_pos - squarred_distance_neg) \
