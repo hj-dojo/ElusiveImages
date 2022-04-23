@@ -9,7 +9,8 @@ class SiameseNet(nn.Module):
         # Create a backbone network from the pretrained models provided in torchvision.models
         class_ = getattr(tvmodels, category)
         self.backbone = class_(pretrained=pretrained, progress=pretrained)
-        self.pretrained = True
+        self.pretrained = pretrained
+        self.fc_layer = None
         if pretrained:
             out_features = None
             for layer in self.backbone.children():
