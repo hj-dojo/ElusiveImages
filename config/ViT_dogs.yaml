@@ -1,0 +1,46 @@
+Train:
+  batch_size: 8
+  learning_rate: 0.0001
+  reg: 0.0005
+  epochs: 10
+  momentum: .9
+  validevery: 10
+  train_path: 'dataset/dogs/train'
+  test_path: 'dataset/dogs/test'
+  val_path: 'dataset/dogs/test'
+  optimizer: 'feature_extractor'
+  fe_opt: 'sdg'
+  data_size: 30
+  logdir: '.'
+  use_map: True
+  use_accuracy: True
+  full_test: True
+  search_size: 16
+
+
+network:
+  model: 'ViT'
+  category: 'vit_b_16'
+  pretrain: True
+  # Total 12 encoder layers from 1 to 11
+  identity_start: 0
+  identity_end: 0
+  identity_step: 1
+
+data:
+  data: 'dataset/dogs'
+  img_h: 224
+  img_w: 224
+  faiss_db: 'vitdb'
+  save_db: True
+  
+loss:
+  loss_type: 'TripletLoss'
+
+dataset:
+  dataset: 'TripletData'
+
+Misc:
+  # Supported log levels: critical, error, warning, info, debug
+  logdir: 'logs'
+  loglevel: 'info'
