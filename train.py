@@ -94,7 +94,7 @@ def set_seed(seed_value):
 def setup_logging(params, seed_value):
     log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}'.format(params['model'].lower(), \
                                         pathlib.Path(params['train_path']).parts[1], params['loss_type'].lower(),
-                                        params['dataset'].lower(), params['optimizer'].lower(), params['epochs'],
+                                        params['dataset'].lower(), params['optimizer'].lower() + params.get('fe_opt', ""), params['epochs'],
                                         str(params['learning_rate']).replace('.', '_'), str(params['momentum']).replace('.','_'),
                                         params['batch_size'], params['img_w'], params['img_h'], seed_value)
 
@@ -150,7 +150,7 @@ def run_experiment(params, log_file_name):
 
     # ----- Optimizer ----- #
     optimizer = create_optimizer(params['model'], model, params['optimizer'], params['learning_rate'],
-                                 params['momentum'], params.get('pretrain', False))
+                                 params['momentum'], params.get('pretrain', False), params)
 
     # ----- Train ----- #
     #v = vars(args)
@@ -192,9 +192,12 @@ def run_experiment(params, log_file_name):
     if use_accuracy:
         log.info("Accuracy change: pre-training {} --> post-training {}".format(pre_train_results.get('accuracy', 'NA'), post_train_results.get('accuracy', 'NA')))
     if use_map:
-        log.info("MAP change: pre-training {} --> post-training {}".format(pre_train_results.get('map', 'NA'),
-                                                                                post_train_results.get('map',
-                                                                                                       'NA')))
+        pre_train_map = pre_train_results.get('maps', [])
+        post_train_map = post_train_results.get('maps', [])
+        avg_pre_train_map = sum(pre_train_map) / len(pre_train_map) if pre_train_map else 0
+        avg_post_train_map = sum(post_train_map) / len(post_train_map) if post_train_map else 0
+        log.info("MAP change: pre-training {} --> post-training {}".format(pre_train_map, post_train_map))
+        log.info("MAP change: Avg pre-training {} --> Avg post-training {}".format(avg_pre_train_map, avg_post_train_map))
     log.info("---" * 60)
 
     plot_filename = '{}.png'.format(log_file_name.replace('analysis', 'learningcurve'))
@@ -327,7 +330,7 @@ def create_dataset(dataset_type, batch_size, train_path, validation_path, img_wi
     return train_loader, train_transforms, val_loader, val_transforms
 
 
-def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum, pretrain):
+def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum, pretrain, params):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # ----- Optimizer ----- #
@@ -351,7 +354,7 @@ def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum,
             param.requires_grad = False
 
         if model_type == 'ViT':
-          model.heads[0] = nn.Linear(model.heads[0].in_features, 1000, device=device)
+          model.heads[0] = nn.Linear(model.heads[0].in_features, params['data_size'], device=device)
 
           #### Furhter experimentation with deeper layers.
           # if args.optimizer.lower() == 'feature_extractor_e11_mlp_l2':
@@ -370,12 +373,17 @@ def create_optimizer(model_type, model, optimizer_type, learning_rate, momentum,
           #         model.encoder.layers.encoder_layer_11.mlp.linear_2.in_features,
           #         model.encoder.layers.encoder_layer_11.mlp.linear_2.out_features, device='cuda')
         else:
-          model.fc = nn.Linear(model.fc.in_features, 1000, device=device)
+          model.fc = nn.Linear(model.fc.in_features, params['data_size'], device=device)
         params_to_update = []
         for param in model.parameters():
             if param.requires_grad == True:
                 params_to_update.append(param)
-        optimizer = torch.optim.Adam(params_to_update, learning_rate)
+        if params.get('fe_opt', "").lower() == 'sdg':
+            log.info("Using sdg to fine tune final FC layer")
+            optimizer = torch.optim.SGD(params_to_update, lr=learning_rate, momentum=momentum)
+        else:
+            log.info("Using adam to fine tune final FC layer")
+            optimizer = torch.optim.Adam(params_to_update, learning_rate)
     else:
         raise Exception("Invalid optimizer option".format(optimizer_type))
     return optimizer
