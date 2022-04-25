@@ -8,7 +8,7 @@ class ContrastiveLoss(torch.nn.Module):
         self.margin = margin
 
     def calc_euclidean(self, x1, x2):
-        return (x1-x2).pow(2).sum(1)
+        return torch.sqrt((x1-x2).pow(2).sum(1))
 
     def forward(self, output1, output2, label):
         # Find the pairwise distance or euclidean distance of two output feature vectors
