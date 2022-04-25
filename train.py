@@ -176,7 +176,7 @@ def run_experiment(params, log_file_name):
         model.train()
         loss, avg_loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
         val_loss, avg_val_loss = evaluate(epoch, val_loader, model, params['loss_type'], criterion)
-        log.info("epoch {0}: Loss = {1}, Validation Loss = {2}".format(epoch, loss, val_loss))
+        log.info("epoch {0}: Loss = {1}, Validation Loss = {2}".format(epoch, avg_loss, avg_val_loss))
         loss_per_iter.append(avg_loss.item())
         val_loss_per_iter.append(avg_val_loss.item())
 
