@@ -92,11 +92,11 @@ def set_seed(seed_value):
 
 
 def setup_logging(params, seed_value):
-    log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}'.format(params['model'].lower(), \
+    log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}_ds{}'.format(params['model'].lower(), \
                                         pathlib.Path(params['train_path']).parts[1], params['loss_type'].lower(),
                                         params['dataset'].lower(), params['optimizer'].lower() + params.get('fe_opt', ""), params['epochs'],
                                         str(params['learning_rate']).replace('.', '_'), str(params['momentum']).replace('.','_'),
-                                        params['batch_size'], params['img_w'], params['img_h'], seed_value)
+                                        params['batch_size'], params['img_w'], params['img_h'], seed_value, params.get('data_size', ""))
 
     os.makedirs(params['logdir'], exist_ok=True)
     log.basicConfig(
@@ -111,6 +111,7 @@ def setup_logging(params, seed_value):
 
 
 def run_experiment(params, log_file_name):
+    log.info("Args: {}".format(params))
     full_test = params.get('full_test', True)
     use_map = params.get('use_map', False)
     use_accuracy = params.get('use_accuracy', True)
@@ -218,6 +219,10 @@ def run_experiment(params, log_file_name):
         model_path = '{}.pth'.format(model_filename.replace('analysis', 'model'))
         torch.save(model.state_dict(), model_path)
 
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform(m.weight)
+        m.bias.data.fill_(0.01)
 
 def create_model(model_name, model_category, pretrain, img_height, img_width, **kwargs):
     # ----- Model ----- #
@@ -226,7 +231,12 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
         model = tvmodels.resnet18()
     elif model_name == 'ViT':
         class_ = getattr(tvmodels, model_category)
-        model = class_(pretrained=pretrain)
+
+        if pretrain:
+            model = class_(pretrained=True)
+        else:
+            model = class_(pretrained=False)
+            model.apply(init_weights)
 
         s, e, step = int(kwargs.get('identity_start', 0)), int(kwargs.get('identity_end', 0)), int(kwargs.get('identity_step', 1))
         for i in range(s, e, step):
