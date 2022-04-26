@@ -35,3 +35,4 @@ Misc:
   # Supported log levels: critical, error, warning, info, debug
   loglevel: 'info'
   logdir: 'logs'
+  savemodel: True
