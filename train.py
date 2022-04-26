@@ -201,13 +201,22 @@ def run_experiment(params, log_file_name):
     log.info("---" * 60)
 
     plot_filename = '{}.png'.format(log_file_name.replace('analysis', 'learningcurve'))
-    plot_learningcurve('Learning Curve: {0}({1})'.format(params['model'], params['loss_type']),
+    plot_learningcurve('Learning Curve: {0}({1}, {2}, {3})'.format(params['model'], params['category'],
+                                                            params['pretrain'], params['loss_type']),
                        loss_per_iter, val_loss_per_iter, "Epoch",
                        "Loss", '{}'.format(os.path.join(params['logdir'], plot_filename)))
     json_filename = os.path.join(params['logdir'], 'json', log_file_name)
     os.makedirs(os.path.dirname(json_filename), exist_ok=True)
     with open(json_filename, 'w') as fp:
         json.dump({'train': loss_per_iter, 'test': val_loss_per_iter}, fp)
+
+    # save model
+    save_model = params.get('savemodel', False)
+    if save_model:
+        model_filename = os.path.join(params['logdir'], 'models', log_file_name)
+        os.makedirs(os.path.dirname(model_filename), exist_ok=True)
+        model_path = '{}.pth'.format(model_filename.replace('analysis', 'model'))
+        torch.save(model.state_dict(), model_path)
 
 
 def create_model(model_name, model_category, pretrain, img_height, img_width, **kwargs):
