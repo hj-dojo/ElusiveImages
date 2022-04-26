@@ -27,6 +27,7 @@ from torch import nn
 import logging as log
 from utils.MAP import compute_map
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', default='./config/SimpleNetwork.yaml')
@@ -159,6 +160,9 @@ def run_experiment(params, log_file_name):
     val_loss_per_iter = []
     trainpath = params['train_path']
     num_epochs = params['epochs']
+    accuracy_dict = OrderedDict()
+    map_dict = OrderedDict()
+    results_dict = OrderedDict()
     for epoch in range(num_epochs):
         if epoch % params['validevery'] == 0:
             log.info("RUNNING VALIDATION AT EPOCH {}".format(epoch))
@@ -173,6 +177,9 @@ def run_experiment(params, log_file_name):
                                         params['img_h'])
 
             pre_train_results = test(valdb, params['val_path'], full_test=full_test, use_map=use_map, search_size=search_size, use_accuracy=use_accuracy)
+            accuracy_dict[epoch] = pre_train_results['accuracy']
+            map_dict[epoch] = sum(pre_train_results['maps']) / len(pre_train_results['maps'])
+            results_dict[epoch] = pre_train_results
 
         model.train()
         loss, avg_loss = train(epoch, train_loader, model, optimizer, params['loss_type'], criterion)
@@ -190,16 +197,20 @@ def run_experiment(params, log_file_name):
     testdb = create_database(params['data_size'], 'Base', val_transforms, model, trainpath, params['img_w'],
                                         params['img_h'], saveto="testsave")
     post_train_results = test(testdb, params['test_path'], full_test=full_test, use_map=use_map, search_size=search_size, use_accuracy=use_accuracy)
+    accuracy_dict[epoch] = post_train_results['accuracy']
+    map_dict[epoch] = sum(pre_train_results['maps']) / len(pre_train_results['maps'])
+    results_dict[epoch] = post_train_results
     if use_accuracy:
-        log.info("Accuracy change: pre-training {} --> post-training {}".format(pre_train_results.get('accuracy', 'NA'), post_train_results.get('accuracy', 'NA')))
+        log.info("Accuracy change: pre-training {} --> post-training {}".format(results_dict[0].get('accuracy', 'NA'), results_dict[epoch].get('accuracy', 'NA')))
     if use_map:
-        pre_train_map = pre_train_results.get('maps', [])
-        post_train_map = post_train_results.get('maps', [])
+        pre_train_map = results_dict[0].get('maps', [])
+        post_train_map = results_dict[epoch].get('maps', [])
         avg_pre_train_map = sum(pre_train_map) / len(pre_train_map) if pre_train_map else 0
         avg_post_train_map = sum(post_train_map) / len(post_train_map) if post_train_map else 0
         log.info("MAP change: pre-training {} --> post-training {}".format(pre_train_map, post_train_map))
         log.info("MAP change: Avg pre-training {} --> Avg post-training {}".format(avg_pre_train_map, avg_post_train_map))
     log.info("---" * 60)
+
 
     plot_filename = '{}.png'.format(log_file_name.replace('analysis', 'learningcurve'))
     plot_learningcurve('Learning Curve: {0}({1}, {2}, {3})'.format(params['model'], params['category'],
@@ -218,6 +229,49 @@ def run_experiment(params, log_file_name):
         os.makedirs(os.path.dirname(model_filename), exist_ok=True)
         model_path = '{}.pth'.format(model_filename.replace('analysis', 'model'))
         torch.save(model.state_dict(), model_path)
+
+    # Plot-map
+    plot_map_bar_graph(pre_train_map, post_train_map, os.path.join(params['logdir'], plot_filename.replace('learningcurve', 'mapbarcurve')))
+
+    # Plot-accuracy
+    plot_accuracy_or_map_line_graph(accuracy_dict, os.path.join(params['logdir'], plot_filename.replace('learningcurve', 'accuracycurve')), tag='Accuracy')
+    # Plot-MAP
+    plot_accuracy_or_map_line_graph(map_dict, os.path.join(params['logdir'], plot_filename.replace('learningcurve', 'maplinecurve')), tag='MAP')
+
+
+
+def plot_map_bar_graph(pre_train_map, post_train_map, filename):
+    X = list(range(1, len(pre_train_map)+1))
+
+    X_axis = np.arange(len(X))
+
+    plt.bar(X_axis - 0.2, pre_train_map, 0.4, label='pre-train model MAP')
+    plt.bar(X_axis + 0.2, post_train_map, 0.4, label='pre-train + additional train model MAP')
+
+    plt.xticks(X_axis, X)
+    plt.xlabel("Categories")
+    plt.ylabel("MAP")
+    plt.title("Transfer learning - MAP comparison")
+    plt.legend(loc=0)
+    plt.grid(alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.show()
+
+
+def plot_accuracy_or_map_line_graph(accuracy_dict, filename, tag):
+    x = list(accuracy_dict.keys())
+    y = list(accuracy_dict.values())
+    plt.plot(x, y, marker='o')
+    plt.title("Epoch vs {}".format(tag))
+    plt.xlabel('Epochs')
+    plt.ylabel('{}'.format(tag))
+    plt.grid(alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.show()
+
+
 
 def init_weights(m):
     if isinstance(m, nn.Linear):
