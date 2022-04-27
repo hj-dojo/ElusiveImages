@@ -9,7 +9,7 @@ Train:
   test_path: 'dataset/dogs/test'
   val_path: 'dataset/dogs/test'
   optimizer: 'feature_extractor'
-  fe_opt: 'sdg'
+  fe_opt: 'adam'
   data_size: 30
   logdir: '.'
   use_map: True
