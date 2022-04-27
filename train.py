@@ -92,11 +92,12 @@ def set_seed(seed_value):
 
 
 def setup_logging(params, seed_value):
-    log_file_name = 'analysis_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_seed{}'.format(params['model'].lower(), \
+    log_file_name = 'analysis_{}_{}_{}_{}_{}_{}_ep{}_lr{}_m{}_bs{}_w{}_h{}_{}_seed{}'.format(params['model'].lower(), params.get('category', ""),\
                                         pathlib.Path(params['train_path']).parts[1], params['loss_type'].lower(),
                                         params['dataset'].lower(), params['optimizer'].lower() + params.get('fe_opt', ""), params['epochs'],
                                         str(params['learning_rate']).replace('.', '_'), str(params['momentum']).replace('.','_'),
-                                        params['batch_size'], params['img_w'], params['img_h'], seed_value)
+                                        params['batch_size'], params['img_w'], params['img_h'],
+                                        params.get('pretrain', ""), seed_value)
 
     os.makedirs(params['logdir'], exist_ok=True)
     log.basicConfig(
