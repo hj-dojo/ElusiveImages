@@ -320,7 +320,7 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
             backbone = model_category
         else:
             backbone = 'resnet18'
-        model = SiameseNet(backbone, pretrain)
+        model = SiameseNet(backbone, pretrain, img_height, img_width)
     elif model_name == 'MLPMixer':
         # TO USE DOWNLOAD PRETRAINED MODEL: wget https://storage.googleapis.com/mixer_models/imagenet21k/Mixer-B_16.npz
         c = CONFIGS[model_category]
