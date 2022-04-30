@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 
-
+# Implementation based on https://towardsdatascience.com/how-to-choose-your-loss-when-designing-a-siamese-neural-net-contrastive-triplet-or-quadruplet-ecba11944ec
 class TripletLoss(nn.Module):
     def __init__(self, margin=1.0):
         super(TripletLoss, self).__init__()

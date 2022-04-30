@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 
 
+# Implementation based on https://towardsdatascience.com/how-to-choose-your-loss-when-designing-a-siamese-neural-net-contrastive-triplet-or-quadruplet-ecba11944ec
 class QuadrupletLoss(torch.nn.Module):
     """
     Quadruplet loss function.
