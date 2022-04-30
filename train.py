@@ -221,7 +221,7 @@ def run_experiment(params, log_file_name):
     json_filename = os.path.join(params['logdir'], 'json', log_file_name)
     os.makedirs(os.path.dirname(json_filename), exist_ok=True)
     with open(json_filename, 'w') as fp:
-        json.dump({'train': loss_per_iter, 'test': val_loss_per_iter}, fp)
+        json.dump(results_dict, fp)
 
     # save model
     save_model = params.get('savemodel', False)
@@ -284,6 +284,17 @@ def create_model(model_name, model_category, pretrain, img_height, img_width, **
     if model_name == 'ResNet':
         # model = resnet32()
         model = tvmodels.resnet18()
+    elif model_name == 'convnext':
+      if model_category == 'tiny':
+        model = tvmodels.convnext_tiny(pretrained=pretrain)
+      elif model_category == 'small':
+        model = tvmodels.convnext_small(pretrained=pretrain)
+      elif model_category == 'base':
+        model = tvmodels.convnext_base(pretrained=pretrain)
+      elif model_category == 'large':
+        model = tvmodels.convnext_base(pretrained=pretrain)
+      else:
+        raise NotImplementedError(model_name + " model not implemented!")
     elif model_name == 'ViT':
         class_ = getattr(tvmodels, model_category)
 
@@ -596,3 +607,4 @@ def plot_learningcurve(title, train_history, validation_history, x_label, y_labe
 
 if __name__ == '__main__':
     main()
+
