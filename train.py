@@ -139,15 +139,16 @@ def run_experiment(params, log_file_name):
                                                                      params['img_w'], params['img_h'], create_validation=True)
 
     # ----- Loss ----- #
+    similarity_type = params.get('similarity_type', 'euclidean')
     if params['loss_type'] == 'TripletLoss':
-        criterion = TripletLoss()
+        criterion = TripletLoss(similarity_type)
     elif params['loss_type'] == 'ContrastiveLoss':
         if 'loss_margin' in params:
-            criterion = ContrastiveLoss(params['loss_margin'])
+            criterion = ContrastiveLoss(params['loss_margin'], similarity_type)
         else:
-            criterion = ContrastiveLoss()
+            criterion = ContrastiveLoss(similarity_type=similarity_type)
     elif params['loss_type'] == 'QuadrupletLoss':
-        criterion = QuadrupletLoss()
+        criterion = QuadrupletLoss(similarity_type)
     else:
         raise NotImplementedError(params['loss_type'] + " loss not implemented!")
 
