@@ -141,14 +141,14 @@ def run_experiment(params, log_file_name):
     # ----- Loss ----- #
     similarity_type = params.get('similarity_type', 'euclidean')
     if params['loss_type'] == 'TripletLoss':
-        criterion = TripletLoss(similarity_type)
+        criterion = TripletLoss(similarity_type=similarity_type)
     elif params['loss_type'] == 'ContrastiveLoss':
         if 'loss_margin' in params:
             criterion = ContrastiveLoss(params['loss_margin'], similarity_type)
         else:
             criterion = ContrastiveLoss(similarity_type=similarity_type)
     elif params['loss_type'] == 'QuadrupletLoss':
-        criterion = QuadrupletLoss(similarity_type)
+        criterion = QuadrupletLoss(similarity_type=similarity_type)
     else:
         raise NotImplementedError(params['loss_type'] + " loss not implemented!")
 
